@@ -10,7 +10,7 @@ We also provide Windows and macOS builds not as a compromise, but as an on-ramp.
 
 ## What It Does
 
-Gosh Transfer sends files between computers using explicit IP addresses or hostnames. No auto-discovery, no cloud services, no magic—you specify where files go.
+Gosh Transfer sends files between computers using explicit IP addresses or hostnames. No auto-discovery, no cloud services, no magic you specify where files go.
 
 ## Screenshots
 
