@@ -1,7 +1,12 @@
 name: Build Flatpak
 
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
 
 jobs:
   build-flatpak:
@@ -104,9 +109,11 @@ jobs:
           flatpak-builder --force-clean --repo=repo build-dir com.gosh.transfer.yml
           flatpak build-bundle repo gosh-transfer.flatpak com.gosh.transfer
 
-      - name: Upload Flatpak artifact
-        uses: actions/upload-artifact@v4
+      - name: Rename Flatpak for release
+        run: mv flatpak-build/gosh-transfer.flatpak flatpak-build/gosh-transfer-linux-x86_64.flatpak
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: linux-flatpak
-          path: flatpak-build/gosh-transfer.flatpak
-          if-no-files-found: error
+          files: flatpak-build/gosh-transfer-linux-x86_64.flatpak
+          fail_on_unmatched_files: true

@@ -1,7 +1,12 @@
 name: Build Linux ARM Packages
 
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
 
 jobs:
   build-linux-arm:
@@ -48,16 +53,10 @@ jobs:
         with:
           args: --bundles rpm
 
-      - name: Upload DEB artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: linux-arm64-deb
-          path: src-tauri/target/release/bundle/deb/*.deb
-          if-no-files-found: error
-
-      - name: Upload RPM artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-arm64-rpm
-          path: src-tauri/target/release/bundle/rpm/*.rpm
-          if-no-files-found: error
+          files: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+          fail_on_unmatched_files: true
