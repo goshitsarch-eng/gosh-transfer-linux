@@ -42,7 +42,7 @@ impl TransferClient {
             // No global timeout - large file transfers can take a long time
             // Use read_timeout to detect stalled connections instead
             .read_timeout(Duration::from_secs(60))
-            .connect_timeout(Duration::from_secs(10))
+            .connect_timeout(Duration::from_secs(30))
             .build()
             .expect("Failed to create HTTP client");
 

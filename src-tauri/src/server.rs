@@ -63,9 +63,16 @@ pub enum ServerEvent {
     /// Transfer progress update
     Progress { progress: TransferProgress },
     /// Transfer completed successfully
-    TransferComplete { transfer_id: String },
+    TransferComplete {
+        #[serde(rename = "transferId")]
+        transfer_id: String,
+    },
     /// Transfer failed
-    TransferFailed { transfer_id: String, error: String },
+    TransferFailed {
+        #[serde(rename = "transferId")]
+        transfer_id: String,
+        error: String,
+    },
 }
 
 impl ServerState {
