@@ -38,7 +38,7 @@ src/
 
 ## State Management
 
-### AppState (`commands.rs:18-26`)
+### AppState (`commands.rs:19-26`)
 
 Central state managed by Tauri:
 

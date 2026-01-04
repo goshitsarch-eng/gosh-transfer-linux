@@ -40,7 +40,7 @@ Gosh Transfer sends files between computers using explicit IP addresses or hostn
 | HTTP Server | Axum 0.8 |
 | HTTP Client | Reqwest 0.12 |
 | Frontend | Svelte 5 |
-| Bundler | Vite 5 |
+| Bundler | Vite 7 |
 
 ### Network Protocol
 
