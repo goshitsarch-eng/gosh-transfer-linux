@@ -1,6 +1,6 @@
 [package]
 name = "gosh-transfer"
-version = "2.0.2"
+version = "2.0.3"
 description = "A clean, explicit file transfer application"
 authors = ["Gosh Contributors"]
 license = "AGPL-3.0"
