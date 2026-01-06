@@ -54,7 +54,7 @@
       "minimumSystemVersion": "10.15",
       "frameworks": [],
       "exceptionDomain": null,
-      "signingIdentity": "-"
+      "signingIdentity": null
     },
     "windows": {
       "wix": null,
