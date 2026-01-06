@@ -38,7 +38,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 # Network utilities
-get_if_addrs = "0.5"
+local-ip-address = "0.6"
 tokio-util = { version = "0.7", features = ["io"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 hostname = "0.4"

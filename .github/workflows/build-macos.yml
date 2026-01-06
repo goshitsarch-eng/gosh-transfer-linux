@@ -27,7 +27,6 @@ jobs:
       APPLE_ID: ${{ secrets.APPLE_ID_GH }}
       APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD_GH }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID_GH }}
-      TAURI_SIGNING: true
 
     steps:
       - name: Checkout repository
@@ -68,6 +67,11 @@ jobs:
           security set-key-partition-list \
             -S apple-tool:,apple:,codesign: \
             -s build.keychain
+
+      - name: Verify signing identity
+        run: |
+          echo "Available signing identities:"
+          security find-identity -v -p codesigning build.keychain
 
       - name: Install frontend dependencies
         run: npm ci

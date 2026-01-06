@@ -431,13 +431,12 @@ impl Default for TransferClient {
 pub fn get_network_interfaces() -> Vec<crate::types::NetworkInterface> {
     let mut interfaces = Vec::new();
 
-    if let Ok(addrs) = get_if_addrs::get_if_addrs() {
-        for iface in addrs {
-            let is_loopback = iface.is_loopback();
-            let ip = iface.ip().to_string();
+    if let Ok(addrs) = local_ip_address::list_afinet_netifas() {
+        for (name, ip) in addrs {
+            let is_loopback = ip.is_loopback();
             interfaces.push(crate::types::NetworkInterface {
-                name: iface.name,
-                ip,
+                name,
+                ip: ip.to_string(),
                 is_loopback,
             });
         }
