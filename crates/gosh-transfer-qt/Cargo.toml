@@ -1,0 +1,36 @@
+[package]
+name = "gosh-transfer-qt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Qt6/QML frontend for Gosh Transfer"
+
+[lib]
+crate-type = ["staticlib"]
+path = "rust/src/lib.rs"
+
+[dependencies]
+# Core shared logic
+gosh-transfer-core = { path = "../gosh-transfer-core" }
+gosh-lan-transfer = { path = "../../../gosh-lan-transfer" }
+
+# CXX-Qt bindings
+cxx.workspace = true
+cxx-qt.workspace = true
+cxx-qt-lib.workspace = true
+
+# Async runtime
+tokio.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Utilities
+chrono.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[build-dependencies]
+cxx-qt-build = "0.7"

@@ -1,0 +1,38 @@
+[package]
+name = "gosh-transfer-gtk"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "GTK4/Libadwaita frontend for Gosh Transfer"
+
+[[bin]]
+name = "gosh-transfer-gtk"
+path = "src/main.rs"
+
+[dependencies]
+# Core shared logic
+gosh-transfer-core.workspace = true
+gosh-lan-transfer.workspace = true
+
+# GTK4 and Libadwaita
+gtk4.workspace = true
+libadwaita.workspace = true
+glib.workspace = true
+gio.workspace = true
+
+# Async runtime and GTK bridge
+tokio.workspace = true
+async-channel.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Utilities
+chrono.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[build-dependencies]
+glib-build-tools = "0.20"

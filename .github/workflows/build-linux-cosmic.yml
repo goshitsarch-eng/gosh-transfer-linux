@@ -1,4 +1,4 @@
-name: Build Linux (GTK4)
+name: Build Linux (COSMIC)
 
 on:
   workflow_dispatch:
@@ -10,20 +10,25 @@ permissions:
   contents: write
 
 jobs:
-  build-linux-gtk:
+  build-linux-cosmic:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install GTK4/libadwaita dependencies
+      - name: Install libcosmic dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libgtk-4-dev \
-            libadwaita-1-dev \
+            libxkbcommon-dev \
+            libwayland-dev \
             libssl-dev \
-            pkg-config
+            pkg-config \
+            libinput-dev \
+            libudev-dev \
+            libgbm-dev \
+            libseat-dev \
+            libfontconfig1-dev
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -31,24 +36,24 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
 
-      - name: Build GTK4 frontend
-        run: cargo build --release -p gosh-transfer-gtk
+      - name: Build COSMIC frontend
+        run: cargo build --release -p gosh-transfer-cosmic
 
       - name: Create tarball
         run: |
           mkdir -p dist
-          cp target/release/gosh-transfer-gtk dist/
-          tar -czvf gosh-transfer-gtk-linux-x86_64.tar.gz -C dist .
+          cp target/release/gosh-transfer-cosmic dist/
+          tar -czvf gosh-transfer-cosmic-linux-x86_64.tar.gz -C dist .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: linux-gtk-x86_64
-          path: gosh-transfer-gtk-linux-x86_64.tar.gz
+          name: linux-cosmic-x86_64
+          path: gosh-transfer-cosmic-linux-x86_64.tar.gz
 
       - name: Upload to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: gosh-transfer-gtk-linux-x86_64.tar.gz
+          files: gosh-transfer-cosmic-linux-x86_64.tar.gz
           fail_on_unmatched_files: true

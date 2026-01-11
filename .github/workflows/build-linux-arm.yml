@@ -1,4 +1,4 @@
-name: Build Linux ARM Packages
+name: Build Linux ARM (GTK4)
 
 on:
   workflow_dispatch:
@@ -10,72 +10,45 @@ permissions:
   contents: write
 
 jobs:
-  build-linux-arm:
+  build-linux-arm-gtk:
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install GTK4/libadwaita dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libgtk-3-dev \
+            libgtk-4-dev \
+            libadwaita-1-dev \
             libssl-dev \
-            patchelf \
-            rpm
+            pkg-config
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
-        with:
-          workspaces: './src-tauri -> target'
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
+      - name: Build GTK4 frontend
+        run: cargo build --release -p gosh-transfer-gtk
 
-      - name: Install frontend dependencies
-        run: npm ci
+      - name: Create tarball
+        run: |
+          mkdir -p dist
+          cp target/release/gosh-transfer-gtk dist/
+          tar -czvf gosh-transfer-gtk-linux-arm64.tar.gz -C dist .
 
-      - name: Build DEB package
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: --bundles deb
-
-      - name: Build RPM package
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: --bundles rpm
-
-      - name: Upload DEB artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: linux-arm64-deb
-          path: src-tauri/target/release/bundle/deb/*.deb
-
-      - name: Upload RPM artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-arm64-rpm
-          path: src-tauri/target/release/bundle/rpm/*.rpm
+          name: linux-gtk-arm64
+          path: gosh-transfer-gtk-linux-arm64.tar.gz
 
       - name: Upload to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            src-tauri/target/release/bundle/deb/*.deb
-            src-tauri/target/release/bundle/rpm/*.rpm
+          files: gosh-transfer-gtk-linux-arm64.tar.gz
           fail_on_unmatched_files: true

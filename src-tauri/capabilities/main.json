@@ -1,6 +1,0 @@
-{
-  "identifier": "main",
-  "description": "Main window permissions for dialog access and transfer commands.",
-  "windows": ["main"],
-  "permissions": ["core:default", "dialog:allow-open", "allow-app-commands"]
-}

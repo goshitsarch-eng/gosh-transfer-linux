@@ -1,12 +1,9 @@
-# Dependencies
-node_modules/
+# Rust build outputs
+/target/
+**/*.rs.bk
 
-# Build outputs
-dist/
-src-tauri/target/
-
-# Vite cache
-.vite/
+# Qt build outputs
+crates/gosh-transfer-qt/build/
 
 # IDE/Editor
 .idea/
@@ -21,7 +18,6 @@ Thumbs.db
 
 # Logs
 *.log
-npm-debug.log*
 
 # Environment files
 .env
@@ -31,10 +27,20 @@ npm-debug.log*
 # Session data
 .claude/
 
-# Rust
-**/*.rs.bk
+# Flatpak build
+.flatpak-builder/
+flatpak-build/
+*.flatpak
 
-# Tauri
-src-tauri/WixTools/
-src-tauri/gen/
-src-tauri/icons/icon.iconset/
+# AppImage build
+AppDir/
+*.AppImage
+
+# Debian packaging
+*.deb
+debian/.debhelper/
+debian/gosh-transfer/
+
+# RPM packaging
+*.rpm
+rpmbuild/

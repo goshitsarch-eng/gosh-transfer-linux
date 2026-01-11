@@ -1,0 +1,25 @@
+[package]
+name = "gosh-transfer-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Core shared logic for Gosh Transfer frontends"
+
+[dependencies]
+# Core transfer engine
+gosh-lan-transfer.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Utilities
+chrono.workspace = true
+thiserror.workspace = true
+hostname.workspace = true
+tracing.workspace = true
+directories.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }
