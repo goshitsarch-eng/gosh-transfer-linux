@@ -28,6 +28,7 @@ mod imp {
         pub pending_card: RefCell<Option<adw::PreferencesGroup>>,
         pub empty_row: RefCell<Option<adw::ActionRow>>,
         pub pending_rows: RefCell<HashMap<String, adw::ActionRow>>,
+        pub batch_buttons: RefCell<Option<gtk4::Box>>,
         pub active_card: RefCell<Option<adw::PreferencesGroup>>,
         pub empty_active_row: RefCell<Option<adw::ActionRow>>,
         pub active_rows: RefCell<HashMap<String, ActiveTransferRow>>,
@@ -103,6 +104,39 @@ mod imp {
             let pending_card = adw::PreferencesGroup::new();
             pending_card.set_title("Pending Transfers");
             pending_card.set_description(Some("Incoming transfer requests will appear here"));
+
+            // Batch action buttons (hidden by default)
+            let batch_box = gtk4::Box::new(gtk4::Orientation::Horizontal, 8);
+            batch_box.set_visible(false);
+
+            let accept_all_btn = gtk4::Button::with_label("Accept All");
+            accept_all_btn.add_css_class("suggested-action");
+            accept_all_btn.add_css_class("pill");
+
+            let reject_all_btn = gtk4::Button::with_label("Reject All");
+            reject_all_btn.add_css_class("destructive-action");
+            reject_all_btn.add_css_class("pill");
+
+            batch_box.append(&accept_all_btn);
+            batch_box.append(&reject_all_btn);
+            pending_card.set_header_suffix(Some(&batch_box));
+            *self.batch_buttons.borrow_mut() = Some(batch_box.clone());
+
+            accept_all_btn.connect_clicked(glib::clone!(
+                #[weak(rename_to = this)]
+                self,
+                move |_| {
+                    this.obj().accept_all_transfers();
+                }
+            ));
+
+            reject_all_btn.connect_clicked(glib::clone!(
+                #[weak(rename_to = this)]
+                self,
+                move |_| {
+                    this.obj().reject_all_transfers();
+                }
+            ));
 
             let empty_row = adw::ActionRow::new();
             empty_row.set_title("No pending transfers");
@@ -288,6 +322,9 @@ impl ReceiveView {
 
         // Store reference
         imp.pending_rows.borrow_mut().insert(transfer.id.clone(), row);
+
+        // Update batch buttons visibility
+        self.update_batch_buttons_visibility();
     }
 
     /// Remove a pending transfer from the UI
@@ -306,6 +343,9 @@ impl ReceiveView {
                 empty_row.set_visible(true);
             }
         }
+
+        // Update batch buttons visibility
+        self.update_batch_buttons_visibility();
     }
 
     /// Clear all pending transfers
@@ -323,10 +363,45 @@ impl ReceiveView {
         if let Some(empty_row) = imp.empty_row.borrow().as_ref() {
             empty_row.set_visible(true);
         }
+
+        // Update batch buttons visibility
+        self.update_batch_buttons_visibility();
+    }
+
+    /// Update visibility of batch buttons
+    fn update_batch_buttons_visibility(&self) {
+        let imp = self.imp();
+        let count = imp.pending_rows.borrow().len();
+        if let Some(batch_box) = imp.batch_buttons.borrow().as_ref() {
+            batch_box.set_visible(count >= 2);
+        }
+    }
+
+    /// Accept all pending transfers
+    fn accept_all_transfers(&self) {
+        if let Some(app) = self.get_app() {
+            app.engine_bridge().accept_all_transfers();
+            self.clear_pending_transfers();
+        }
+    }
+
+    /// Reject all pending transfers
+    fn reject_all_transfers(&self) {
+        if let Some(app) = self.get_app() {
+            app.engine_bridge().reject_all_transfers();
+            self.clear_pending_transfers();
+        }
+    }
+
+    fn get_app(&self) -> Option<GoshTransferApplication> {
+        self.root()
+            .and_then(|r| r.downcast::<gtk4::Window>().ok())
+            .and_then(|w| w.application())
+            .and_then(|a| a.downcast::<GoshTransferApplication>().ok())
     }
 
     /// Add an active transfer (when accepted)
-    pub fn add_active_transfer(&self, transfer_id: &str, title: &str) {
+    pub fn add_active_transfer(&self, transfer_id: &str, title: &str, app: &GoshTransferApplication) {
         let imp = self.imp();
 
         // Skip if already exists
@@ -357,6 +432,21 @@ impl ReceiveView {
         status_label.set_valign(gtk4::Align::Center);
         status_label.add_css_class("dim-label");
         row.add_suffix(&status_label);
+
+        // Cancel button
+        let cancel_btn = gtk4::Button::from_icon_name("process-stop-symbolic");
+        cancel_btn.set_tooltip_text(Some("Cancel transfer"));
+        cancel_btn.set_valign(gtk4::Align::Center);
+        cancel_btn.add_css_class("flat");
+
+        let tid = transfer_id.to_string();
+        let app_weak = app.downgrade();
+        cancel_btn.connect_clicked(move |_| {
+            if let Some(app) = app_weak.upgrade() {
+                app.engine_bridge().cancel_transfer(tid.clone());
+            }
+        });
+        row.add_suffix(&cancel_btn);
 
         // Add to card
         if let Some(card) = imp.active_card.borrow().as_ref() {
@@ -394,6 +484,15 @@ impl ReceiveView {
 
             active.status_label.set_text(&format!("{}%", percent));
             active.row.set_subtitle(&format!("{} / {} - {}", transferred_str, total_str, speed_str));
+        }
+    }
+
+    /// Update transfer retry status
+    pub fn update_transfer_retry(&self, transfer_id: &str, attempt: u32, max_attempts: u32) {
+        let imp = self.imp();
+
+        if let Some(active) = imp.active_rows.borrow().get(transfer_id) {
+            active.status_label.set_text(&format!("Retry {}/{}", attempt, max_attempts));
         }
     }
 

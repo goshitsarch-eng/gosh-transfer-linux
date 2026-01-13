@@ -15,11 +15,14 @@ mod imp {
     #[derive(Default)]
     pub struct SendView {
         pub dest_row: RefCell<Option<adw::EntryRow>>,
+        pub test_button: RefCell<Option<gtk4::Button>>,
+        pub test_spinner: RefCell<Option<gtk4::Spinner>>,
         pub favorites_dropdown: RefCell<Option<adw::ComboRow>>,
         pub favorites_list: RefCell<Vec<(String, String, String)>>, // (id, name, address)
         pub files_list: RefCell<Option<gtk4::ListBox>>,
         pub files_row: RefCell<Option<adw::ActionRow>>,
         pub selected_files: RefCell<Vec<std::path::PathBuf>>,
+        pub selected_directory: RefCell<Option<std::path::PathBuf>>,
         pub send_button: RefCell<Option<gtk4::Button>>,
     }
 
@@ -101,6 +104,30 @@ mod imp {
 
             let dest_row = adw::EntryRow::new();
             dest_row.set_title("Address");
+
+            // Test connection button and spinner
+            let test_box = gtk4::Box::new(gtk4::Orientation::Horizontal, 4);
+            let test_spinner = gtk4::Spinner::new();
+            test_spinner.set_visible(false);
+            let test_button = gtk4::Button::from_icon_name("network-transmit-symbolic");
+            test_button.set_tooltip_text(Some("Test connection"));
+            test_button.set_valign(gtk4::Align::Center);
+            test_button.add_css_class("flat");
+            test_box.append(&test_spinner);
+            test_box.append(&test_button);
+            dest_row.add_suffix(&test_box);
+
+            *self.test_button.borrow_mut() = Some(test_button.clone());
+            *self.test_spinner.borrow_mut() = Some(test_spinner.clone());
+
+            test_button.connect_clicked(glib::clone!(
+                #[weak(rename_to = this)]
+                self,
+                move |_| {
+                    this.test_connection();
+                }
+            ));
+
             dest_card.add(&dest_row);
             *self.dest_row.borrow_mut() = Some(dest_row.clone());
 
@@ -136,17 +163,30 @@ mod imp {
 
             // Files card
             let files_card = adw::PreferencesGroup::new();
-            files_card.set_title("Files");
-            files_card.set_description(Some("Drag and drop files here or click to browse"));
+            files_card.set_title("Files or Folder");
+            files_card.set_description(Some("Select files or a folder to send"));
 
             let files_row = adw::ActionRow::new();
-            files_row.set_title("Select files");
-            files_row.set_subtitle("No files selected");
-            let browse_button = gtk4::Button::from_icon_name("folder-open-symbolic");
+            files_row.set_title("Select files or folder");
+            files_row.set_subtitle("Nothing selected");
+
+            // Button box for file and folder pickers
+            let picker_box = gtk4::Box::new(gtk4::Orientation::Horizontal, 4);
+
+            let browse_button = gtk4::Button::from_icon_name("document-open-symbolic");
+            browse_button.set_tooltip_text(Some("Select files"));
             browse_button.set_valign(gtk4::Align::Center);
             browse_button.add_css_class("flat");
-            files_row.add_suffix(&browse_button);
-            files_row.set_activatable_widget(Some(&browse_button));
+
+            let folder_button = gtk4::Button::from_icon_name("folder-symbolic");
+            folder_button.set_tooltip_text(Some("Select folder"));
+            folder_button.set_valign(gtk4::Align::Center);
+            folder_button.add_css_class("flat");
+
+            picker_box.append(&browse_button);
+            picker_box.append(&folder_button);
+            files_row.add_suffix(&picker_box);
+
             files_card.add(&files_row);
             *self.files_row.borrow_mut() = Some(files_row.clone());
 
@@ -155,6 +195,14 @@ mod imp {
                 self,
                 move |button| {
                     this.show_file_chooser(button);
+                }
+            ));
+
+            folder_button.connect_clicked(glib::clone!(
+                #[weak(rename_to = this)]
+                self,
+                move |button| {
+                    this.show_folder_chooser(button);
                 }
             ));
 
@@ -190,9 +238,10 @@ mod imp {
                 .unwrap_or(false);
 
             let has_files = !self.selected_files.borrow().is_empty();
+            let has_directory = self.selected_directory.borrow().is_some();
 
             if let Some(button) = self.send_button.borrow().as_ref() {
-                button.set_sensitive(has_dest && has_files);
+                button.set_sensitive(has_dest && (has_files || has_directory));
             }
         }
 
@@ -233,6 +282,8 @@ mod imp {
 
                         if !paths.is_empty() {
                             let count = paths.len();
+                            // Clear directory selection when files are selected
+                            *this.selected_directory.borrow_mut() = None;
                             *this.selected_files.borrow_mut() = paths;
 
                             if let Some(row) = this.files_row.borrow().as_ref() {
@@ -252,6 +303,113 @@ mod imp {
             ));
 
             dialog.show();
+        }
+
+        fn show_folder_chooser(&self, button: &gtk4::Button) {
+            let window = button
+                .root()
+                .and_then(|r| r.downcast::<gtk4::Window>().ok());
+
+            let dialog = gtk4::FileChooserDialog::new(
+                Some("Select Folder to Send"),
+                window.as_ref(),
+                gtk4::FileChooserAction::SelectFolder,
+                &[
+                    ("Cancel", gtk4::ResponseType::Cancel),
+                    ("Select", gtk4::ResponseType::Accept),
+                ],
+            );
+            dialog.set_modal(true);
+
+            dialog.connect_response(glib::clone!(
+                #[weak(rename_to = this)]
+                self,
+                move |dialog, response| {
+                    if response == gtk4::ResponseType::Accept {
+                        if let Some(file) = dialog.file() {
+                            if let Some(path) = file.path() {
+                                // Clear files selection when folder is selected
+                                this.selected_files.borrow_mut().clear();
+                                *this.selected_directory.borrow_mut() = Some(path.clone());
+
+                                if let Some(row) = this.files_row.borrow().as_ref() {
+                                    let name = path
+                                        .file_name()
+                                        .map(|n| n.to_string_lossy().to_string())
+                                        .unwrap_or_else(|| "folder".to_string());
+                                    row.set_subtitle(&format!("Folder: {}", name));
+                                }
+
+                                this.update_send_button_state();
+                            }
+                        }
+                    }
+                    dialog.close();
+                }
+            ));
+
+            dialog.show();
+        }
+
+        fn test_connection(&self) {
+            let obj = self.obj();
+            if let Some(app) = obj.get_app() {
+                let address = self
+                    .dest_row
+                    .borrow()
+                    .as_ref()
+                    .map(|r| r.text().to_string())
+                    .unwrap_or_default();
+
+                if address.is_empty() {
+                    return;
+                }
+
+                let port = app.settings().port;
+
+                // Show spinner
+                if let Some(spinner) = self.test_spinner.borrow().as_ref() {
+                    spinner.set_visible(true);
+                    spinner.start();
+                }
+                if let Some(button) = self.test_button.borrow().as_ref() {
+                    button.set_sensitive(false);
+                }
+
+                let test_button = self.test_button.borrow().clone();
+                let test_spinner = self.test_spinner.borrow().clone();
+
+                app.engine_bridge().check_peer(address, port, move |reachable| {
+                    // Hide spinner
+                    if let Some(spinner) = test_spinner.as_ref() {
+                        spinner.stop();
+                        spinner.set_visible(false);
+                    }
+                    if let Some(button) = test_button.as_ref() {
+                        button.set_sensitive(true);
+                        if reachable {
+                            button.set_icon_name("emblem-ok-symbolic");
+                            button.add_css_class("success");
+                        } else {
+                            button.set_icon_name("dialog-error-symbolic");
+                            button.add_css_class("error");
+                        }
+                        // Reset icon after 3 seconds
+                        glib::timeout_add_seconds_local_once(
+                            3,
+                            glib::clone!(
+                                #[weak]
+                                button,
+                                move || {
+                                    button.set_icon_name("network-transmit-symbolic");
+                                    button.remove_css_class("success");
+                                    button.remove_css_class("error");
+                                }
+                            ),
+                        );
+                    }
+                });
+            }
         }
 
         fn show_add_favorite_dialog(&self, button: &gtk4::Button) {
@@ -335,22 +493,31 @@ mod imp {
                     .map(|r| r.text().to_string())
                     .unwrap_or_default();
 
-                // Port is fixed at 53317 (not configurable yet)
-                let port = app.settings().port;
-
-                let files = self.selected_files.borrow().clone();
-
-                if !address.is_empty() && !files.is_empty() {
-                    let engine = app.engine_bridge();
-                    engine.send_files(address, port, files);
-
-                    // Clear selection after sending
-                    self.selected_files.borrow_mut().clear();
-                    if let Some(row) = self.files_row.borrow().as_ref() {
-                        row.set_subtitle("No files selected");
-                    }
-                    self.update_send_button_state();
+                if address.is_empty() {
+                    return;
                 }
+
+                let port = app.settings().port;
+                let engine = app.engine_bridge();
+
+                // Check if we have a directory to send
+                if let Some(dir) = self.selected_directory.borrow().clone() {
+                    engine.send_directory(address, port, dir);
+                    *self.selected_directory.borrow_mut() = None;
+                } else {
+                    // Send files
+                    let files = self.selected_files.borrow().clone();
+                    if !files.is_empty() {
+                        engine.send_files(address, port, files);
+                        self.selected_files.borrow_mut().clear();
+                    }
+                }
+
+                // Clear selection after sending
+                if let Some(row) = self.files_row.borrow().as_ref() {
+                    row.set_subtitle("Nothing selected");
+                }
+                self.update_send_button_state();
             }
         }
     }

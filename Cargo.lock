@@ -756,8 +756,9 @@ dependencies = [
 
 [[package]]
 name = "gosh-lan-transfer"
-version = "0.1.0"
-source = "git+https://github.com/goshitsarch-eng/gosh-lan-transfer#c28e83b7e214416b203cdfcb255f2fe370d7799d"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "389a1b74c45c127a83cbc6399f425fa81465988551b4adb85016bb2d75873f3a"
 dependencies = [
  "axum",
  "bytes",

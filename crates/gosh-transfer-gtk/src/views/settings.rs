@@ -17,6 +17,7 @@ mod imp {
     #[derive(Default)]
     pub struct SettingsView {
         pub name_row: RefCell<Option<adw::EntryRow>>,
+        pub port_row: RefCell<Option<adw::SpinRow>>,
         pub download_row: RefCell<Option<adw::ActionRow>>,
         pub download_path: RefCell<PathBuf>,
         pub receive_only_row: RefCell<Option<adw::SwitchRow>>,
@@ -25,6 +26,8 @@ mod imp {
         pub trusted_hosts_group: RefCell<Option<adw::PreferencesGroup>>,
         pub trusted_host_rows: RefCell<Vec<adw::ActionRow>>,
         pub add_host_row: RefCell<Option<adw::EntryRow>>,
+        pub max_retries_row: RefCell<Option<adw::SpinRow>>,
+        pub retry_delay_row: RefCell<Option<adw::SpinRow>>,
     }
 
     #[glib::object_subclass]
@@ -76,6 +79,13 @@ mod imp {
             device_group.add(&name_row);
             *self.name_row.borrow_mut() = Some(name_row);
 
+            let port_row = adw::SpinRow::with_range(1024.0, 65535.0, 1.0);
+            port_row.set_title("Server Port");
+            port_row.set_subtitle("Port for receiving transfers");
+            port_row.set_value(53317.0);
+            device_group.add(&port_row);
+            *self.port_row.borrow_mut() = Some(port_row);
+
             content.append(&device_group);
 
             // Transfer settings
@@ -107,6 +117,20 @@ mod imp {
             receive_only_row.set_subtitle("Disable sending files to others");
             transfer_group.add(&receive_only_row);
             *self.receive_only_row.borrow_mut() = Some(receive_only_row);
+
+            let max_retries_row = adw::SpinRow::with_range(0.0, 10.0, 1.0);
+            max_retries_row.set_title("Max Retries");
+            max_retries_row.set_subtitle("Retry attempts for failed transfers");
+            max_retries_row.set_value(3.0);
+            transfer_group.add(&max_retries_row);
+            *self.max_retries_row.borrow_mut() = Some(max_retries_row);
+
+            let retry_delay_row = adw::SpinRow::with_range(500.0, 10000.0, 100.0);
+            retry_delay_row.set_title("Retry Delay (ms)");
+            retry_delay_row.set_subtitle("Delay between retry attempts");
+            retry_delay_row.set_value(1000.0);
+            transfer_group.add(&retry_delay_row);
+            *self.retry_delay_row.borrow_mut() = Some(retry_delay_row);
 
             content.append(&transfer_group);
 
@@ -218,8 +242,12 @@ mod imp {
                     .map(|r| r.text().to_string())
                     .unwrap_or_default();
 
-                // Port is fixed at 53317 (not configurable yet)
-                let port = app.settings().port;
+                let port = self
+                    .port_row
+                    .borrow()
+                    .as_ref()
+                    .map(|r| r.value() as u16)
+                    .unwrap_or(53317);
 
                 let download_dir = self.download_path.borrow().clone();
 
@@ -251,6 +279,20 @@ mod imp {
                 // Get current trusted hosts (preserve existing)
                 let trusted_hosts = app.settings().trusted_hosts;
 
+                let max_retries = self
+                    .max_retries_row
+                    .borrow()
+                    .as_ref()
+                    .map(|r| r.value() as u32)
+                    .unwrap_or(3);
+
+                let retry_delay_ms = self
+                    .retry_delay_row
+                    .borrow()
+                    .as_ref()
+                    .map(|r| r.value() as u64)
+                    .unwrap_or(1000);
+
                 let new_settings = AppSettings {
                     port,
                     device_name: name,
@@ -259,7 +301,12 @@ mod imp {
                     receive_only,
                     notifications_enabled,
                     theme: theme.clone(),
+                    max_retries,
+                    retry_delay_ms,
                 };
+
+                // Create engine config before moving new_settings
+                let engine_config = new_settings.to_engine_config();
 
                 if let Err(e) = app.settings_store().update(new_settings) {
                     tracing::error!("Failed to save settings: {}", e);
@@ -273,6 +320,9 @@ mod imp {
                 } else {
                     // Apply theme immediately
                     app.apply_theme(&theme);
+
+                    // Propagate settings to engine (device_name, download_dir, trusted_hosts, receive_only)
+                    app.engine_bridge().update_config(engine_config);
 
                     // Show success toast
                     if let Some(window) = obj.root().and_then(|r| r.downcast::<adw::ApplicationWindow>().ok()) {
@@ -308,6 +358,11 @@ impl SettingsView {
             row.set_text(&settings.device_name);
         }
 
+        // Port
+        if let Some(row) = imp.port_row.borrow().as_ref() {
+            row.set_value(settings.port as f64);
+        }
+
         // Download directory
         *imp.download_path.borrow_mut() = settings.download_dir.clone();
         if let Some(row) = imp.download_row.borrow().as_ref() {
@@ -339,6 +394,16 @@ impl SettingsView {
         // Notifications
         if let Some(row) = imp.notifications_row.borrow().as_ref() {
             row.set_active(settings.notifications_enabled);
+        }
+
+        // Max retries
+        if let Some(row) = imp.max_retries_row.borrow().as_ref() {
+            row.set_value(settings.max_retries as f64);
+        }
+
+        // Retry delay
+        if let Some(row) = imp.retry_delay_row.borrow().as_ref() {
+            row.set_value(settings.retry_delay_ms as f64);
         }
 
         // Trusted hosts

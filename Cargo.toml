@@ -15,7 +15,7 @@ description = "A clean, explicit file transfer application"
 
 [workspace.dependencies]
 # Core transfer engine
-gosh-lan-transfer = { git = "https://github.com/goshitsarch-eng/gosh-lan-transfer" }
+gosh-lan-transfer = "0.2"
 gosh-transfer-core = { path = "crates/gosh-transfer-core" }
 
 # Async runtime

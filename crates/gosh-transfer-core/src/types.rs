@@ -23,10 +23,24 @@ pub struct AppSettings {
     /// Theme preference: "dark", "light", or "system"
     #[serde(default = "default_theme")]
     pub theme: String,
+    /// Maximum retry attempts for failed transfers
+    #[serde(default = "default_max_retries")]
+    pub max_retries: u32,
+    /// Delay between retry attempts in milliseconds
+    #[serde(default = "default_retry_delay_ms")]
+    pub retry_delay_ms: u64,
 }
 
 fn default_theme() -> String {
     "system".to_string()
+}
+
+fn default_max_retries() -> u32 {
+    3
+}
+
+fn default_retry_delay_ms() -> u64 {
+    1000
 }
 
 impl Default for AppSettings {
@@ -45,6 +59,8 @@ impl Default for AppSettings {
             receive_only: false,
             notifications_enabled: true,
             theme: default_theme(),
+            max_retries: default_max_retries(),
+            retry_delay_ms: default_retry_delay_ms(),
         }
     }
 }
@@ -58,6 +74,8 @@ impl AppSettings {
             .download_dir(&self.download_dir)
             .trusted_hosts(self.trusted_hosts.clone())
             .receive_only(self.receive_only)
+            .max_retries(self.max_retries)
+            .retry_delay_ms(self.retry_delay_ms)
             .build()
     }
 }
@@ -121,6 +139,6 @@ mod tests {
     fn test_engine_config_conversion() {
         let settings = AppSettings::default();
         let config = settings.to_engine_config();
-        assert_eq!(config.port(), 53317);
+        assert_eq!(config.port, 53317);
     }
 }

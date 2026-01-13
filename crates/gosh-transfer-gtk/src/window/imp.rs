@@ -431,7 +431,7 @@ impl GoshTransferWindow {
                                     .unwrap_or_else(|| "Transfer".to_string());
 
                                 // Add to active if not already there, then update progress
-                                view.add_active_transfer(&progress.transfer_id, &title);
+                                view.add_active_transfer(&progress.transfer_id, &title, &app);
                                 view.update_transfer_progress(
                                     &progress.transfer_id,
                                     progress.bytes_transferred,
@@ -471,6 +471,25 @@ impl GoshTransferWindow {
                         }
                         EngineEvent::ServerStopped => {
                             tracing::info!("Server stopped");
+                        }
+                        EngineEvent::TransferRetry {
+                            transfer_id,
+                            attempt,
+                            max_attempts,
+                            ..
+                        } => {
+                            tracing::info!(
+                                "Transfer retry: {} - attempt {}/{}",
+                                transfer_id,
+                                attempt,
+                                max_attempts
+                            );
+                            if let Some(view) = receive_view.as_ref() {
+                                view.update_transfer_retry(&transfer_id, attempt, max_attempts);
+                            }
+                        }
+                        EngineEvent::PortChanged { old_port, new_port } => {
+                            tracing::info!("Port changed from {} to {}", old_port, new_port);
                         }
                     }
                 }

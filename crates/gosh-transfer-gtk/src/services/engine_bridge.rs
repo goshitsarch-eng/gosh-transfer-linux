@@ -27,11 +27,26 @@ pub enum EngineCommand {
         port: u16,
         paths: Vec<PathBuf>,
     },
+    SendDirectory {
+        address: String,
+        port: u16,
+        path: PathBuf,
+    },
     AcceptTransfer {
         id: String,
     },
     RejectTransfer {
         id: String,
+    },
+    AcceptAllTransfers,
+    RejectAllTransfers,
+    CancelTransfer {
+        id: String,
+    },
+    CheckPeer {
+        address: String,
+        port: u16,
+        reply: Sender<bool>,
     },
     GetPendingTransfers {
         reply: Sender<Vec<PendingTransfer>>,
@@ -122,6 +137,41 @@ impl EngineBridge {
                             if let Err(e) = eng.reject_transfer(&id).await {
                                 tracing::error!("Reject failed: {}", e);
                             }
+                        }
+                        Ok(EngineCommand::SendDirectory { address, port, path }) => {
+                            let eng = engine.lock().await;
+                            if let Err(e) = eng.send_directory(&address, port, path).await {
+                                tracing::error!("Send directory failed: {}", e);
+                            }
+                        }
+                        Ok(EngineCommand::AcceptAllTransfers) => {
+                            let eng = engine.lock().await;
+                            let results = eng.accept_all_transfers().await;
+                            for (id, result) in results {
+                                if let Err(e) = result {
+                                    tracing::error!("Accept {} failed: {}", id, e);
+                                }
+                            }
+                        }
+                        Ok(EngineCommand::RejectAllTransfers) => {
+                            let eng = engine.lock().await;
+                            let results = eng.reject_all_transfers().await;
+                            for (id, result) in results {
+                                if let Err(e) = result {
+                                    tracing::error!("Reject {} failed: {}", id, e);
+                                }
+                            }
+                        }
+                        Ok(EngineCommand::CancelTransfer { id }) => {
+                            let eng = engine.lock().await;
+                            if let Err(e) = eng.cancel_transfer(&id).await {
+                                tracing::error!("Cancel failed: {}", e);
+                            }
+                        }
+                        Ok(EngineCommand::CheckPeer { address, port, reply }) => {
+                            let eng = engine.lock().await;
+                            let reachable = eng.check_peer(&address, port).await.unwrap_or(false);
+                            let _ = reply.send(reachable).await;
                         }
                         Ok(EngineCommand::GetPendingTransfers { reply }) => {
                             let eng = engine.lock().await;
@@ -216,6 +266,67 @@ impl EngineBridge {
         let tx = self.command_tx.clone();
         glib::spawn_future_local(async move {
             let _ = tx.send(EngineCommand::RejectTransfer { id }).await;
+        });
+    }
+
+    /// Send a directory to peer
+    pub fn send_directory(&self, address: String, port: u16, path: PathBuf) {
+        let tx = self.command_tx.clone();
+        glib::spawn_future_local(async move {
+            let _ = tx
+                .send(EngineCommand::SendDirectory {
+                    address,
+                    port,
+                    path,
+                })
+                .await;
+        });
+    }
+
+    /// Accept all pending transfers
+    pub fn accept_all_transfers(&self) {
+        let tx = self.command_tx.clone();
+        glib::spawn_future_local(async move {
+            let _ = tx.send(EngineCommand::AcceptAllTransfers).await;
+        });
+    }
+
+    /// Reject all pending transfers
+    pub fn reject_all_transfers(&self) {
+        let tx = self.command_tx.clone();
+        glib::spawn_future_local(async move {
+            let _ = tx.send(EngineCommand::RejectAllTransfers).await;
+        });
+    }
+
+    /// Cancel an active transfer
+    pub fn cancel_transfer(&self, id: String) {
+        let tx = self.command_tx.clone();
+        glib::spawn_future_local(async move {
+            let _ = tx.send(EngineCommand::CancelTransfer { id }).await;
+        });
+    }
+
+    /// Check if a peer is reachable
+    pub fn check_peer<F>(&self, address: String, port: u16, callback: F)
+    where
+        F: FnOnce(bool) + 'static,
+    {
+        let (reply_tx, reply_rx) = async_channel::bounded(1);
+        let tx = self.command_tx.clone();
+
+        glib::spawn_future_local(async move {
+            let _ = tx
+                .send(EngineCommand::CheckPeer {
+                    address,
+                    port,
+                    reply: reply_tx,
+                })
+                .await;
+
+            if let Ok(reachable) = reply_rx.recv().await {
+                callback(reachable);
+            }
         });
     }
 
