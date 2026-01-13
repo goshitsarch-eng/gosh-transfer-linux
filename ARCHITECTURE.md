@@ -1,226 +1,218 @@
 # Architecture
 
-This document describes the internal architecture of Gosh Transfer based on code analysis.
+This document describes the internal architecture of Gosh Transfer Linux, a GTK4/Libadwaita frontend for the gosh-lan-transfer engine.
 
-## Module Structure
+## Overview
 
-### Backend (`src-tauri/src/`)
+The application is a Rust workspace with two crates that provide a native Linux desktop experience for peer-to-peer file transfers.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    GTK4 Main Loop                        │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │              gosh-transfer-gtk                      │ │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐            │ │
+│  │  │ SendView │ │ReceiveView│ │SettingsView│ ...      │ │
+│  │  └────┬─────┘ └────┬─────┘ └────┬─────┘            │ │
+│  │       │            │            │                   │ │
+│  │       └────────────┼────────────┘                   │ │
+│  │                    ▼                                │ │
+│  │           ┌─────────────────┐                       │ │
+│  │           │  EngineBridge   │                       │ │
+│  │           │ (async_channel) │                       │ │
+│  │           └────────┬────────┘                       │ │
+│  └────────────────────┼────────────────────────────────┘ │
+└───────────────────────┼─────────────────────────────────┘
+                        │
+┌───────────────────────┼─────────────────────────────────┐
+│                       ▼            Tokio Runtime         │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │              GoshTransferEngine                     │ │
+│  │         (from gosh-lan-transfer crate)              │ │
+│  │                                                     │ │
+│  │  • HTTP Server (Axum) on port 53317                 │ │
+│  │  • HTTP Client (Reqwest) for sending                │ │
+│  │  • Transfer protocol implementation                 │ │
+│  └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+                        │
+┌───────────────────────┼─────────────────────────────────┐
+│                       ▼                                  │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │              gosh-transfer-core                     │ │
+│  │                                                     │ │
+│  │  • SettingsStore     (~/.config/gosh-transfer/)     │ │
+│  │  • FileFavoritesStore                               │ │
+│  │  • TransferHistory                                  │ │
+│  └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Crate Structure
+
+### `gosh-transfer-core`
+
+Shared business logic, UI-agnostic. Location: `crates/gosh-transfer-core/`
 
 ```
 src/
-├── main.rs         # Entry point, calls lib::run()
-├── lib.rs          # App initialization, server startup, event forwarding
-├── types.rs        # All shared data structures
-├── server.rs       # Axum HTTP server for receiving files
-├── client.rs       # HTTP client for sending files
-├── commands.rs     # Tauri IPC command handlers
-├── settings.rs     # Settings persistence
-└── favorites.rs    # Favorites persistence
+├── lib.rs          # Re-exports and engine type re-exports
+├── types.rs        # AppSettings, AppError definitions
+├── settings.rs     # SettingsStore (persistent settings)
+├── favorites.rs    # FileFavoritesStore (implements FavoritesPersistence)
+└── history.rs      # TransferHistory (persistent, max 100 entries)
 ```
 
-### Frontend (`src/`)
+Key types:
+- `AppSettings` - Serializable settings struct with `to_engine_config()` conversion
+- `SettingsStore` - Thread-safe RwLock-wrapped settings with JSON persistence
+- `FileFavoritesStore` - Implements `gosh_lan_transfer::FavoritesPersistence` trait
+- `TransferHistory` - FIFO queue with disk persistence
+
+### `gosh-transfer-gtk`
+
+GTK4/Libadwaita frontend. Location: `crates/gosh-transfer-gtk/`
 
 ```
 src/
-├── main.js                     # Svelte app mount
-├── App.svelte                  # Main layout, navigation, event listeners
-├── lib/
-│   ├── theme.js                # Theme switching logic
-│   └── components/
-│       ├── SendView.svelte     # File sending UI
-│       ├── ReceiveView.svelte  # Incoming transfer UI
-│       ├── TransfersView.svelte # Transfer history
-│       ├── SettingsView.svelte  # Settings UI
-│       └── AboutView.svelte     # About page
-└── styles/
-    └── global.css              # Global styles
+├── main.rs              # Entry point, logging setup
+├── application.rs       # GoshTransferApplication (Adw::Application subclass)
+├── window/
+│   ├── mod.rs           # GoshTransferWindow wrapper
+│   └── imp.rs           # Window implementation, navigation, engine events
+├── views/
+│   ├── mod.rs           # View exports
+│   ├── send.rs          # SendView - file sending UI
+│   ├── receive.rs       # ReceiveView - incoming transfers
+│   ├── transfers.rs     # TransfersView - history display
+│   ├── settings.rs      # SettingsView - configuration UI
+│   └── about.rs         # AboutView - app info
+├── services/
+│   ├── mod.rs           # Service exports
+│   └── engine_bridge.rs # EngineBridge - async/sync bridge
+└── widgets/
+    └── mod.rs           # Custom widget exports (empty currently)
 ```
 
-## State Management
+## EngineBridge: The Critical Component
 
-### AppState (`commands.rs:19-26`)
+The `EngineBridge` (`services/engine_bridge.rs`) solves the fundamental mismatch between GTK's synchronous main loop and the async `GoshTransferEngine`.
 
-Central state managed by Tauri:
+### How it works
+
+1. **Initialization**: Creates a Tokio runtime with 2 worker threads
+2. **Command channel**: UI sends `EngineCommand` variants via `async_channel::Sender`
+3. **Event channel**: Engine events forwarded to UI via `async_channel::Receiver`
+4. **GTK integration**: Uses `glib::spawn_future_local()` to bridge async operations
+
+### Command Types
 
 ```rust
-pub struct AppState {
-    pub favorites: FavoritesStore,        // Persisted to disk
-    pub client: TransferClient,           // HTTP client singleton
-    pub server_state: Arc<ServerState>,   // Shared with server task
-    pub settings_store: SettingsStore,    // Persisted to disk
-    pub settings: RwLock<AppSettings>,    // In-memory copy
-    pub transfer_history: RwLock<Vec<TransferRecord>>, // Volatile
+pub enum EngineCommand {
+    StartServer,
+    StopServer,
+    ResolveAddress { address: String, reply: Sender<ResolveResult> },
+    SendFiles { address: String, port: u16, paths: Vec<PathBuf> },
+    AcceptTransfer { id: String },
+    RejectTransfer { id: String },
+    GetPendingTransfers { reply: Sender<Vec<PendingTransfer>> },
+    GetInterfaces { reply: Sender<Vec<NetworkInterface>> },
+    UpdateConfig { config: EngineConfig },
 }
 ```
 
-### ServerState (`server.rs:40-55`)
+### Data Flow
 
-State for the HTTP server:
-
-```rust
-pub struct ServerState {
-    pub settings: RwLock<AppSettings>,
-    pub pending_transfers: RwLock<HashMap<String, PendingTransfer>>,
-    pub approved_tokens: RwLock<HashMap<String, String>>,
-    pub rejected_transfers: RwLock<HashMap<String, String>>,
-    pub received_files: RwLock<HashMap<String, HashSet<String>>>,
-    pub event_tx: broadcast::Sender<ServerEvent>,
-    pub download_dir: RwLock<PathBuf>,
-}
+**UI → Engine:**
+```
+User action → View method → EngineBridge.send_files()
+    → glib::spawn_future_local → async_channel::send
+    → Tokio runtime → GoshTransferEngine.send_files()
 ```
 
-## Event Flow
-
-### Server to Frontend
-
+**Engine → UI:**
 ```
-Server (Axum)
-    → ServerEvent (broadcast channel)
-    → lib.rs event forwarder
-    → Tauri emit()
-    → Frontend listen()
+GoshTransferEngine event → mpsc::Receiver
+    → EngineBridge task → async_channel::send
+    → Window event handler (glib::spawn_future_local)
+    → View update
 ```
 
-Events:
-- `transfer-request` - New incoming transfer
-- `transfer-progress` - Bytes received update
-- `transfer-complete` - All files received
-- `transfer-failed` - Error during receive
+## Application Lifecycle
 
-### Client to Frontend
+1. `main.rs`: Initialize tracing, create `GoshTransferApplication`
+2. `application.rs`: On `activate`:
+   - Initialize `SettingsStore`, `FileFavoritesStore`, `TransferHistory`
+   - Create `EngineBridge` with settings converted to `EngineConfig`
+   - Create and present `GoshTransferWindow`
+3. `window/imp.rs`: On `constructed`:
+   - Setup navigation sidebar
+   - Create all views
+   - `setup_engine_events()` starts server and subscribes to events
 
-```
-TransferClient
-    → TransferProgress (broadcast channel)
-    → lib.rs event forwarder
-    → Tauri emit("send-progress")
-    → Frontend listen()
-```
+## Event Handling
 
-### Frontend to Backend
+The window subscribes to engine events in `setup_engine_events()`:
 
-```
-Frontend invoke()
-    → Tauri command handler
-    → AppState access
-    → Result returned
-```
+| Event | Handler |
+|-------|---------|
+| `TransferRequest` | Add to pending, show badge |
+| `TransferProgress` | Update progress bar, move to active |
+| `TransferComplete` | Mark complete, remove after 3s |
+| `TransferFailed` | Show error, remove after 5s |
+| `ServerStarted` | Log port |
+| `ServerStopped` | Log |
 
-## Transfer Protocol Detail
+## Configuration
 
-### Sending Files
+Configuration path determined by `directories::ProjectDirs::from("com", "gosh", "transfer")`:
+- Linux: `~/.config/gosh-transfer/`
 
-1. **Resolve hostname** (`client.rs:61-102`)
-   - If already IP: return immediately
-   - Otherwise: DNS lookup via `ToSocketAddrs`
+Files:
+| File | Format | Max Size |
+|------|--------|----------|
+| `settings.json` | JSON | ~500 bytes |
+| `favorites.json` | JSON | Unbounded |
+| `history.json` | JSON | 100 entries |
 
-2. **Request transfer** (`client.rs:155-197`)
-   - POST to `/transfer` with `TransferRequest`
-   - Contains: transfer_id, sender_name, files[], total_size
-
-3. **Handle response**
-   - If `accepted: true`: proceed with token
-   - If `accepted: false`: poll `/transfer/status` every 500ms for 120s
-
-4. **Send files** (`client.rs:252-344`)
-   - For each file: POST to `/chunk` with query params
-   - Stream file content as body
-   - Track progress with atomic counter
-
-### Receiving Files
-
-1. **Accept request** (`server.rs:196-278`)
-   - Create `PendingTransfer` record
-   - If trusted host: auto-accept with token
-   - Otherwise: emit `TransferRequest` event, return pending
-
-2. **Status polling** (`server.rs:281-319`)
-   - Check approved_tokens map
-   - Check rejected_transfers map
-   - Check pending_transfers map
-   - Return appropriate status
-
-3. **Receive chunks** (`server.rs:322-513`)
-   - Verify token matches
-   - Create file with conflict resolution
-   - Stream body to file
-   - Emit progress events
-   - Track received files per transfer
-   - Emit complete when all files received
-
-## File Conflict Resolution (`server.rs:141-173`)
-
-When writing received files:
-
-```
-file.txt → file.txt
-file.txt (exists) → file (1).txt
-file (1).txt (exists) → file (2).txt
-...up to (999)
-```
-
-Uses `OpenOptions::create_new(true)` for atomic uniqueness check.
-
-## Configuration Paths
-
-Determined by `directories::ProjectDirs::from("com", "gosh", "transfer")`:
-
-| Platform | Path |
-|----------|------|
-| Linux | `~/.config/gosh-transfer/` |
-| macOS | `~/Library/Application Support/com.gosh.transfer/` |
-| Windows | `%APPDATA%\gosh\transfer\config\` |
-
-## Tauri Commands Reference
-
-### Favorites
-- `list_favorites() → Vec<Favorite>`
-- `add_favorite(name, address) → Favorite`
-- `update_favorite(id, name?, address?) → Favorite`
-- `delete_favorite(id)`
-
-### Network
-- `resolve_hostname(address) → ResolveResult`
-- `get_interfaces() → Vec<NetworkInterface>`
-- `check_peer(address, port) → bool`
-- `get_peer_info(address, port) → JSON`
-
-### Transfers
-- `send_files(address, port, file_paths)`
-- `accept_transfer(transfer_id) → token`
-- `reject_transfer(transfer_id)`
-- `get_pending_transfers() → Vec<PendingTransfer>`
-- `get_transfer_history() → Vec<TransferRecord>`
-- `clear_transfer_history()`
-
-### Settings
-- `get_settings() → AppSettings`
-- `update_settings(new_settings)`
-- `add_trusted_host(host)`
-- `remove_trusted_host(host)`
-
-### Server
-- `get_server_status() → JSON`
-
-## Timeouts and Constants
+## Constants
 
 | Constant | Value | Location |
 |----------|-------|----------|
-| Server port | 53317 | `lib.rs:61` |
-| Connect timeout | 10s | `client.rs:45` |
-| Read timeout | 60s | `client.rs:44` |
-| Approval timeout | 120s | `client.rs:209` |
-| Approval poll interval | 500ms | `client.rs:210` |
-| Progress throttle | 32KB | `client.rs:300` |
-| Filename conflict limit | 1000 | `server.rs:147` |
-| Event channel capacity | 100 | `server.rs:73` |
+| App ID | `com.gosh.Transfer` | `main.rs:12` |
+| Default port | 53317 | `types.rs:39` |
+| Window size | 1024×768 | `window/imp.rs:19-20` |
+| Tokio workers | 2 | `engine_bridge.rs:62` |
+| Command channel | 32 | `engine_bridge.rs:56` |
+| Event channel | 64 | `engine_bridge.rs:57` |
+| History max | 100 | `history.rs:13` |
 
-## Unimplemented Features
+## External Dependencies
 
-Based on code analysis, these are declared but not functional:
+The transfer protocol implementation lives entirely in [gosh-lan-transfer](https://github.com/goshitsarch-eng/gosh-lan-transfer) (git dependency). This crate provides:
+- `GoshTransferEngine` - Main engine struct
+- `EngineConfig` - Configuration builder
+- `EngineEvent` - Event enum for transfer lifecycle
+- `FavoritesPersistence` - Trait for custom favorites storage
+- Type definitions for transfers, peers, progress, etc.
 
-1. **Port configuration** - Setting stored but server uses hardcoded value
-2. **System notifications** - `notifications_enabled` setting exists but no notification code
-3. **Transfer speed** - `speed_bps` always 0 (has TODO comment)
-4. **IPv6** - Code comment claims dual-stack but only binds IPv4
-5. **Transfer history persistence** - In-memory only
+This application does not implement any HTTP server/client logic itself.
+
+## Engine Capabilities vs GTK Implementation
+
+The `gosh-lan-transfer` engine supports more features than currently exposed in the GTK frontend:
+
+| Capability | Engine | GTK Frontend |
+|------------|--------|--------------|
+| Send files | ✓ | ✓ |
+| Send directories (preserving structure) | ✓ | ✗ |
+| Accept/reject transfers | ✓ | ✓ |
+| Batch accept/reject | ✓ | ✗ |
+| Cancel mid-transfer | ✓ | ✗ |
+| Runtime port change | ✓ | ✗ |
+| Automatic retry with backoff | ✓ | ✓ (via engine) |
+| Progress tracking | ✓ | ✓ |
+| TransferRetry event | ✓ | ✗ (not handled) |
+| Peer health checks | ✓ | ✗ |
+
+These represent potential future enhancements for the GTK frontend.

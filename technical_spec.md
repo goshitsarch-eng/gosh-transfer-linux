@@ -1,0 +1,249 @@
+# Technical Specification
+
+## System Architecture
+
+Gosh Transfer Linux is a native GTK4/Libadwaita desktop application that provides a graphical interface for the `gosh-lan-transfer` file transfer engine.
+
+### High-Level Architecture
+
+```
+┌────────────────────────────────────────────────────┐
+│                  GTK4 Main Loop                     │
+│  ┌──────────────────────────────────────────────┐  │
+│  │           gosh-transfer-gtk                  │  │
+│  │  ┌────────┐ ┌────────┐ ┌────────┐           │  │
+│  │  │  Views │ │ Window │ │  App   │           │  │
+│  │  └───┬────┘ └───┬────┘ └───┬────┘           │  │
+│  │      └──────────┼──────────┘                │  │
+│  │                 ▼                           │  │
+│  │         ┌─────────────┐                     │  │
+│  │         │EngineBridge │                     │  │
+│  │         └──────┬──────┘                     │  │
+│  └────────────────┼─────────────────────────────┘  │
+└───────────────────┼────────────────────────────────┘
+                    │ async_channel
+┌───────────────────┼────────────────────────────────┐
+│                   ▼           Tokio Runtime        │
+│  ┌──────────────────────────────────────────────┐  │
+│  │         GoshTransferEngine                   │  │
+│  │    (from gosh-lan-transfer crate)            │  │
+│  └──────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────┘
+                    │
+┌───────────────────┼────────────────────────────────┐
+│                   ▼                                │
+│  ┌──────────────────────────────────────────────┐  │
+│  │           gosh-transfer-core                 │  │
+│  │  • SettingsStore                             │  │
+│  │  • FileFavoritesStore                        │  │
+│  │  • TransferHistory                           │  │
+│  └──────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────┘
+```
+
+## Technology Stack
+
+| Layer | Technology | Version |
+|-------|------------|---------|
+| UI Framework | GTK4 | 0.9 |
+| UI Toolkit | Libadwaita | 0.7 |
+| Language | Rust | 2021 edition |
+| Async Runtime | Tokio | Multi-threaded |
+| Transfer Engine | gosh-lan-transfer | Git dependency |
+| Serialization | Serde + JSON | Latest |
+| Logging | tracing + tracing-subscriber | Latest |
+
+## Crate Structure
+
+### Workspace Layout
+
+```
+gosh-transfer-linux/
+├── Cargo.toml              # Workspace root
+├── crates/
+│   ├── gosh-transfer-core/ # Shared business logic
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── types.rs
+│   │       ├── settings.rs
+│   │       ├── favorites.rs
+│   │       └── history.rs
+│   └── gosh-transfer-gtk/  # GTK4 frontend
+│       └── src/
+│           ├── main.rs
+│           ├── application.rs
+│           ├── window/
+│           ├── views/
+│           ├── services/
+│           └── widgets/
+└── .github/workflows/      # CI/CD
+```
+
+### Dependencies
+
+**gosh-transfer-core:**
+- `gosh-lan-transfer` - Transfer engine (implements protocol)
+- `serde`, `serde_json` - Configuration serialization
+- `directories` - Platform config paths
+- `uuid` - Transfer ID generation
+- `chrono` - Timestamps
+
+**gosh-transfer-gtk:**
+- `gtk4` - GTK4 bindings
+- `libadwaita` - Adwaita widgets
+- `glib`, `gio` - GLib/GIO bindings
+- `async-channel` - Async/sync bridge
+- `tokio` - Async runtime
+- `tracing` - Logging
+
+## Data Models
+
+### AppSettings
+
+```rust
+pub struct AppSettings {
+    pub port: u16,                    // Default: 53317
+    pub device_name: String,          // Default: hostname
+    pub download_dir: PathBuf,        // Default: ~/Downloads
+    pub trusted_hosts: Vec<String>,   // Auto-accept IPs
+    pub receive_only: bool,           // Disable sending
+    pub notifications_enabled: bool,  // System notifications
+    pub theme: String,                // "system", "light", "dark"
+}
+```
+
+### Favorite
+
+```rust
+pub struct Favorite {
+    pub id: String,      // UUID
+    pub name: String,    // Display name
+    pub address: String, // IP or hostname
+}
+```
+
+### TransferRecord
+
+```rust
+pub struct TransferRecord {
+    pub id: String,
+    pub direction: TransferDirection, // Send or Receive
+    pub peer_address: String,
+    pub peer_name: Option<String>,
+    pub files: Vec<FileInfo>,
+    pub total_bytes: u64,
+    pub status: TransferStatus,
+    pub started_at: DateTime<Utc>,
+    pub completed_at: Option<DateTime<Utc>>,
+}
+```
+
+## Data Storage
+
+### Configuration Directory
+
+Location: `~/.config/gosh-transfer/` (via `directories` crate)
+
+| File | Purpose | Format | Limits |
+|------|---------|--------|--------|
+| `settings.json` | Application settings | JSON | ~500 bytes |
+| `favorites.json` | Saved peer addresses | JSON | Unbounded |
+| `history.json` | Transfer history | JSON | 100 entries max |
+
+### Persistence Strategy
+
+- **Settings**: Read on startup, write on save button click
+- **Favorites**: Read on startup, write immediately on add/remove
+- **History**: Read on startup, write on each transfer completion, FIFO eviction at 100 entries
+
+## Network Protocol
+
+Implemented by `gosh-lan-transfer` crate. This application does not implement protocol logic.
+
+### Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/health` | GET | Server availability check |
+| `/transfer` | POST | Initiate transfer request |
+| `/transfer/status` | GET | Poll approval status |
+| `/chunk` | POST | Stream file data |
+
+### Security Model
+
+- UUID tokens authorize uploads per transfer
+- Filename sanitization prevents path traversal
+- Designed for trusted networks (LAN/VPN/Tailscale)
+- No built-in encryption (rely on network-level security)
+
+## EngineBridge Pattern
+
+The `EngineBridge` solves the async/sync impedance mismatch between GTK's main loop and the async transfer engine.
+
+### Command Flow (UI → Engine)
+
+```
+User action
+  → View method call
+  → EngineBridge.method()
+  → glib::spawn_future_local()
+  → async_channel::send(EngineCommand)
+  → Tokio runtime receives
+  → GoshTransferEngine.method()
+```
+
+### Event Flow (Engine → UI)
+
+```
+GoshTransferEngine event
+  → mpsc::Receiver in bridge task
+  → async_channel::send(EngineEvent)
+  → Window event handler (glib::spawn_future_local)
+  → View update methods
+```
+
+### Channel Configuration
+
+| Channel | Capacity | Purpose |
+|---------|----------|---------|
+| Command | 32 | UI commands to engine |
+| Event | 64 | Engine events to UI |
+
+## Performance Requirements
+
+| Metric | Target |
+|--------|--------|
+| Startup time | < 500ms |
+| Memory usage | < 100MB idle |
+| Transfer overhead | < 5% of raw throughput |
+| UI responsiveness | 60 FPS during transfers |
+
+## Infrastructure
+
+### Build Targets
+
+| Target | Workflow | Output |
+|--------|----------|--------|
+| Linux x86_64 | `build-linux.yml` | `gosh-transfer-gtk` binary |
+| Linux ARM64 | `build-linux-arm.yml` | `gosh-transfer-gtk` binary |
+| Flatpak | `build-flatpak.yml` | `.flatpak` bundle |
+
+### System Dependencies
+
+**Ubuntu/Debian:**
+```bash
+libgtk-4-dev libadwaita-1-dev libssl-dev pkg-config
+```
+
+**Fedora:**
+```bash
+gtk4-devel libadwaita-devel openssl-devel
+```
+
+## Security Considerations
+
+1. **Network trust**: Assumes trusted network environment
+2. **File writes**: Downloads only to user-specified directory
+3. **Path sanitization**: Handled by engine, prevents directory traversal
+4. **No privilege escalation**: Runs as normal user
+5. **Config permissions**: Standard user-only file permissions
