@@ -2,9 +2,6 @@
 /target/
 **/*.rs.bk
 
-# Qt build outputs
-crates/gosh-transfer-qt/build/
-
 # IDE/Editor
 .idea/
 .vscode/
