@@ -283,6 +283,9 @@ mod imp {
         fn save_settings(&self) {
             let obj = self.obj();
             if let Some(app) = obj.get_app() {
+                // Track original port for change detection
+                let original_port = app.settings().port;
+
                 let name = self
                     .name_row
                     .borrow()
@@ -296,6 +299,7 @@ mod imp {
                     .as_ref()
                     .map(|r| r.value() as u16)
                     .unwrap_or(53317);
+                let port_changed = original_port != port;
 
                 let download_dir = self.download_path.borrow().clone();
 
@@ -411,6 +415,32 @@ mod imp {
                         let toast = adw::Toast::new("Settings saved");
                         if let Some(overlay) = window.content().and_then(|c| c.downcast::<adw::ToastOverlay>().ok()) {
                             overlay.add_toast(toast);
+                        }
+
+                        // Show restart recommendation if port changed
+                        if port_changed {
+                            let dialog = adw::MessageDialog::new(
+                                Some(&window),
+                                Some("Port Changed"),
+                                Some("You changed the server port. It's recommended to close and reopen the app for the change to take full effect."),
+                            );
+
+                            dialog.add_response("dismiss", "Dismiss");
+                            dialog.add_response("restart", "Quit and Reopen");
+                            dialog.set_response_appearance("restart", adw::ResponseAppearance::Suggested);
+                            dialog.set_default_response(Some("dismiss"));
+
+                            dialog.connect_response(None, move |_, response| {
+                                if response == "restart" {
+                                    // Restart the app by spawning a new instance and exiting
+                                    if let Ok(exe) = std::env::current_exe() {
+                                        let _ = std::process::Command::new(exe).spawn();
+                                    }
+                                    std::process::exit(0);
+                                }
+                            });
+
+                            dialog.present();
                         }
                     }
                 }

@@ -342,9 +342,15 @@ impl GoshTransferWindow {
             receive_view.load_data(app);
         }
 
+        // Load transfer history
+        if let Some(transfers_view) = self.transfers_view.borrow().as_ref() {
+            transfers_view.load_history(app);
+        }
+
         // Subscribe to engine events
         let event_rx = app.engine_bridge().event_receiver();
         let receive_view = self.receive_view.borrow().clone();
+        let transfers_view = self.transfers_view.borrow().clone();
         let receive_badge = self.receive_badge.borrow().clone();
         let pending_count = std::rc::Rc::new(std::cell::Cell::new(0u32));
         let app_weak = app.downgrade();
@@ -448,6 +454,11 @@ impl GoshTransferWindow {
                             if let Some(view) = receive_view.as_ref() {
                                 view.remove_pending_transfer(&transfer_id);
                                 view.mark_transfer_complete(&transfer_id);
+                            }
+
+                            // Refresh history view
+                            if let Some(view) = transfers_view.as_ref() {
+                                view.load_history(&app);
                             }
                         }
                         EngineEvent::TransferFailed { transfer_id, error } => {

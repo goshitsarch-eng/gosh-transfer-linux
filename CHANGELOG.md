@@ -8,8 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Transfer history display in Transfers view with direction icons, file info, size, status, and relative timestamps
+- Last resolved IP display for favorites (shown when selecting a favorite with a different resolved IP)
 - Network interface category filtering in Settings (WiFi, Ethernet, VPN, Docker, Other)
 - Real-time hostname resolution feedback in send view with visual status
+- Port change restart recommendation dialog with option to quit and reopen app
 
 ### Changed
 - Simplified to GTK4-only build, removing Qt and Cosmic frontends

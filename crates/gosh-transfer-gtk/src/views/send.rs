@@ -20,7 +20,9 @@ mod imp {
         pub test_button: RefCell<Option<gtk4::Button>>,
         pub test_spinner: RefCell<Option<gtk4::Spinner>>,
         pub favorites_dropdown: RefCell<Option<adw::ComboRow>>,
-        pub favorites_list: RefCell<Vec<(String, String, String)>>, // (id, name, address)
+        #[allow(clippy::type_complexity)]
+        pub favorites_list: RefCell<Vec<(String, String, String, Option<String>)>>, // (id, name, address, last_resolved_ip)
+        pub favorite_ip_label: RefCell<Option<gtk4::Label>>,
         pub files_list: RefCell<Option<gtk4::ListBox>>,
         pub files_row: RefCell<Option<adw::ActionRow>>,
         pub selected_files: RefCell<Vec<std::path::PathBuf>>,
@@ -81,6 +83,17 @@ mod imp {
             favorites_card.add(&favorites_dropdown);
             *self.favorites_dropdown.borrow_mut() = Some(favorites_dropdown.clone());
 
+            // Label to show last resolved IP when favorite is selected
+            let favorite_ip_label = gtk4::Label::new(None);
+            favorite_ip_label.set_halign(gtk4::Align::Start);
+            favorite_ip_label.set_margin_start(12);
+            favorite_ip_label.set_margin_top(4);
+            favorite_ip_label.add_css_class("dim-label");
+            favorite_ip_label.add_css_class("caption");
+            favorite_ip_label.set_visible(false);
+            favorites_card.add(&favorite_ip_label);
+            *self.favorite_ip_label.borrow_mut() = Some(favorite_ip_label);
+
             // Connect favorite selection
             favorites_dropdown.connect_selected_notify(glib::clone!(
                 #[weak(rename_to = this)]
@@ -89,9 +102,23 @@ mod imp {
                     let selected = dropdown.selected() as usize;
                     let favorites = this.favorites_list.borrow();
                     if selected < favorites.len() {
-                        let (_, _, address) = &favorites[selected];
+                        let (_, _, address, last_ip) = &favorites[selected];
                         if let Some(dest_row) = this.dest_row.borrow().as_ref() {
                             dest_row.set_text(address);
+                        }
+
+                        // Show last resolved IP if available and different from address
+                        if let Some(label) = this.favorite_ip_label.borrow().as_ref() {
+                            if let Some(ip) = last_ip {
+                                if ip != address {
+                                    label.set_text(&format!("Last resolved: {}", ip));
+                                    label.set_visible(true);
+                                } else {
+                                    label.set_visible(false);
+                                }
+                            } else {
+                                label.set_visible(false);
+                            }
                         }
                     }
                 }
@@ -151,6 +178,12 @@ mod imp {
                 move |_| {
                     this.update_send_button_state();
                     this.schedule_address_resolution();
+
+                    // Hide favorite IP label when address is manually edited
+                    let label = this.favorite_ip_label.borrow().clone();
+                    if let Some(l) = label {
+                        l.set_visible(false);
+                    }
                 }
             ));
 
@@ -318,6 +351,8 @@ mod imp {
                 }
 
                 let resolution_label = self.resolution_label.borrow().clone();
+                let favorites_store = app.favorites_store().clone();
+                let address_for_update = address.clone();
 
                 app.engine_bridge().resolve_address(address, move |result| {
                     if let Some(label) = resolution_label.as_ref() {
@@ -326,6 +361,11 @@ mod imp {
                             label.set_text(&format!("Resolved to {}", ip));
                             label.remove_css_class("error");
                             label.add_css_class("success");
+
+                            // Update favorite's last_resolved_ip if this address is a favorite
+                            if let Err(e) = favorites_store.update_resolved_ip(&address_for_update, ip) {
+                                tracing::debug!("Could not update resolved IP for favorite: {}", e);
+                            }
                         } else {
                             let error_msg = result.error.as_deref().unwrap_or("Could not resolve hostname");
                             label.set_text(error_msg);
@@ -639,7 +679,12 @@ impl SendView {
 
                 for fav in favorites {
                     names.push(format!("{} ({})", fav.name, fav.address));
-                    list.push((fav.id.clone(), fav.name.clone(), fav.address.clone()));
+                    list.push((
+                        fav.id.clone(),
+                        fav.name.clone(),
+                        fav.address.clone(),
+                        fav.last_resolved_ip.clone(),
+                    ));
                 }
 
                 *imp.favorites_list.borrow_mut() = list;
