@@ -7,9 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Real-time hostname resolution feedback in send view with visual status
+
 ### Changed
 - Simplified to GTK4-only build, removing Qt and Cosmic frontends
 - Now a pure Rust application using GTK4/Libadwaita
+- Moved Pending Transfers above Your Addresses in receive view for quicker access
+- Moved Trusted Hosts above Appearance in settings
+- Updated port description to "Port for file transfers"
+- Updated copyright to 2026 Goshitsarch
 
 ### Removed
 - Qt6/QML frontend (`gosh-transfer-qt`)
