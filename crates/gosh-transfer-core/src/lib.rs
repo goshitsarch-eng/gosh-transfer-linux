@@ -18,7 +18,7 @@ pub mod types;
 pub use favorites::FileFavoritesStore;
 pub use history::TransferHistory;
 pub use settings::SettingsStore;
-pub use types::{AppError, AppSettings};
+pub use types::{AppError, AppSettings, InterfaceCategory, InterfaceFilters};
 
 // Re-export engine types for convenience
 pub use gosh_lan_transfer::{

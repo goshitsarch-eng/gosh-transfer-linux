@@ -2,7 +2,7 @@
 // Gosh Transfer GTK - Settings View
 
 use crate::application::GoshTransferApplication;
-use gosh_transfer_core::AppSettings;
+use gosh_transfer_core::{AppSettings, InterfaceFilters};
 use gtk4::prelude::*;
 use gtk4::subclass::prelude::*;
 use gtk4::gio;
@@ -28,6 +28,12 @@ mod imp {
         pub add_host_row: RefCell<Option<adw::EntryRow>>,
         pub max_retries_row: RefCell<Option<adw::SpinRow>>,
         pub retry_delay_row: RefCell<Option<adw::SpinRow>>,
+        // Interface filter switches
+        pub show_wifi_row: RefCell<Option<adw::SwitchRow>>,
+        pub show_ethernet_row: RefCell<Option<adw::SwitchRow>>,
+        pub show_vpn_row: RefCell<Option<adw::SwitchRow>>,
+        pub show_docker_row: RefCell<Option<adw::SwitchRow>>,
+        pub show_other_row: RefCell<Option<adw::SwitchRow>>,
     }
 
     #[glib::object_subclass]
@@ -152,6 +158,50 @@ mod imp {
             appearance_group.add(&notifications_row);
             *self.notifications_row.borrow_mut() = Some(notifications_row);
 
+            content.append(&appearance_group);
+
+            // Network Interface Filters
+            let interface_group = adw::PreferencesGroup::new();
+            interface_group.set_title("Network Interfaces");
+            interface_group.set_description(Some("Choose which interface types to show in Receive"));
+
+            let wifi_row = adw::SwitchRow::new();
+            wifi_row.set_title("WiFi");
+            wifi_row.set_subtitle("Wireless interfaces (wl*)");
+            wifi_row.set_active(true);
+            interface_group.add(&wifi_row);
+            *self.show_wifi_row.borrow_mut() = Some(wifi_row);
+
+            let ethernet_row = adw::SwitchRow::new();
+            ethernet_row.set_title("Ethernet");
+            ethernet_row.set_subtitle("Wired interfaces (en*, eth*)");
+            ethernet_row.set_active(true);
+            interface_group.add(&ethernet_row);
+            *self.show_ethernet_row.borrow_mut() = Some(ethernet_row);
+
+            let vpn_row = adw::SwitchRow::new();
+            vpn_row.set_title("VPN");
+            vpn_row.set_subtitle("Tailscale and tunnel interfaces");
+            vpn_row.set_active(true);
+            interface_group.add(&vpn_row);
+            *self.show_vpn_row.borrow_mut() = Some(vpn_row);
+
+            let docker_row = adw::SwitchRow::new();
+            docker_row.set_title("Docker");
+            docker_row.set_subtitle("Container bridge interfaces");
+            docker_row.set_active(false);
+            interface_group.add(&docker_row);
+            *self.show_docker_row.borrow_mut() = Some(docker_row);
+
+            let other_row = adw::SwitchRow::new();
+            other_row.set_title("Other");
+            other_row.set_subtitle("Unrecognized network interfaces");
+            other_row.set_active(true);
+            interface_group.add(&other_row);
+            *self.show_other_row.borrow_mut() = Some(other_row);
+
+            content.append(&interface_group);
+
             // Trusted hosts
             let trusted_group = adw::PreferencesGroup::new();
             trusted_group.set_title("Trusted Hosts");
@@ -159,8 +209,6 @@ mod imp {
             *self.trusted_hosts_group.borrow_mut() = Some(trusted_group.clone());
 
             content.append(&trusted_group);
-
-            content.append(&appearance_group);
 
             scrolled.set_child(Some(&content));
             obj.append(&scrolled);
@@ -293,6 +341,39 @@ mod imp {
                     .map(|r| r.value() as u64)
                     .unwrap_or(1000);
 
+                let interface_filters = InterfaceFilters {
+                    show_wifi: self
+                        .show_wifi_row
+                        .borrow()
+                        .as_ref()
+                        .map(|r| r.is_active())
+                        .unwrap_or(true),
+                    show_ethernet: self
+                        .show_ethernet_row
+                        .borrow()
+                        .as_ref()
+                        .map(|r| r.is_active())
+                        .unwrap_or(true),
+                    show_vpn: self
+                        .show_vpn_row
+                        .borrow()
+                        .as_ref()
+                        .map(|r| r.is_active())
+                        .unwrap_or(true),
+                    show_docker: self
+                        .show_docker_row
+                        .borrow()
+                        .as_ref()
+                        .map(|r| r.is_active())
+                        .unwrap_or(false),
+                    show_other: self
+                        .show_other_row
+                        .borrow()
+                        .as_ref()
+                        .map(|r| r.is_active())
+                        .unwrap_or(true),
+                };
+
                 let new_settings = AppSettings {
                     port,
                     device_name: name,
@@ -303,6 +384,7 @@ mod imp {
                     theme: theme.clone(),
                     max_retries,
                     retry_delay_ms,
+                    interface_filters,
                 };
 
                 // Create engine config before moving new_settings
@@ -404,6 +486,23 @@ impl SettingsView {
         // Retry delay
         if let Some(row) = imp.retry_delay_row.borrow().as_ref() {
             row.set_value(settings.retry_delay_ms as f64);
+        }
+
+        // Interface filters
+        if let Some(row) = imp.show_wifi_row.borrow().as_ref() {
+            row.set_active(settings.interface_filters.show_wifi);
+        }
+        if let Some(row) = imp.show_ethernet_row.borrow().as_ref() {
+            row.set_active(settings.interface_filters.show_ethernet);
+        }
+        if let Some(row) = imp.show_vpn_row.borrow().as_ref() {
+            row.set_active(settings.interface_filters.show_vpn);
+        }
+        if let Some(row) = imp.show_docker_row.borrow().as_ref() {
+            row.set_active(settings.interface_filters.show_docker);
+        }
+        if let Some(row) = imp.show_other_row.borrow().as_ref() {
+            row.set_active(settings.interface_filters.show_other);
         }
 
         // Trusted hosts

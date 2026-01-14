@@ -3,6 +3,7 @@
 
 use crate::application::GoshTransferApplication;
 use gosh_lan_transfer::PendingTransfer;
+use gosh_transfer_core::InterfaceCategory;
 use gtk4::prelude::*;
 use gtk4::subclass::prelude::*;
 use libadwaita as adw;
@@ -194,31 +195,37 @@ impl ReceiveView {
 
         // Load network addresses
         let addresses_card = imp.addresses_card.borrow().clone();
+        let interface_filters = settings.interface_filters.clone();
         app.engine_bridge().get_interfaces(move |interfaces| {
             if let Some(card) = addresses_card.as_ref() {
-                if interfaces.is_empty() {
+                // Filter interfaces based on settings
+                let filtered: Vec<_> = interfaces
+                    .into_iter()
+                    .filter(|iface| {
+                        // Always skip loopback
+                        if iface.name == "lo" {
+                            return false;
+                        }
+                        let category = InterfaceCategory::from_name(&iface.name);
+                        interface_filters.should_show(category)
+                    })
+                    .collect();
+
+                if filtered.is_empty() {
                     let row = adw::ActionRow::new();
-                    row.set_title("No network interfaces found");
+                    if !interface_filters.any_enabled() {
+                        row.set_title("All interface types hidden");
+                        row.set_subtitle("Enable interface types in Settings");
+                    } else {
+                        row.set_title("No matching interfaces found");
+                        row.set_subtitle("Check your network connection");
+                    }
                     card.add(&row);
                 } else {
-                    for iface in interfaces {
-                        // Skip loopback
-                        if iface.name == "lo" {
-                            continue;
-                        }
-
-                        // Determine interface type for icon/description
-                        let (icon, description) = if iface.name.starts_with("tailscale") || iface.name.starts_with("tun") {
-                            ("network-vpn-symbolic", "Tailscale VPN")
-                        } else if iface.name.starts_with("wl") {
-                            ("network-wireless-symbolic", "WiFi")
-                        } else if iface.name.starts_with("en") || iface.name.starts_with("eth") {
-                            ("network-wired-symbolic", "Ethernet")
-                        } else if iface.name.starts_with("docker") || iface.name.starts_with("br-") {
-                            ("network-server-symbolic", "Docker")
-                        } else {
-                            ("network-workgroup-symbolic", &iface.name as &str)
-                        };
+                    for iface in filtered {
+                        let category = InterfaceCategory::from_name(&iface.name);
+                        let icon = category.icon_name();
+                        let description = category.display_label(&iface.name);
 
                         let row = adw::ActionRow::new();
 
