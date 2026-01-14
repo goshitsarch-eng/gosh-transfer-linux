@@ -69,38 +69,43 @@
 ## Functional Requirements
 
 ### FR1: File Sending
-- [ ] Select multiple files via native file picker
-- [ ] Enter destination as IP address or hostname
-- [ ] Resolve hostnames to IP addresses
-- [ ] Display transfer progress with speed
-- [ ] Handle transfer failures gracefully
+- [x] Select multiple files via native file picker
+- [x] Select directories for transfer
+- [x] Enter destination as IP address or hostname
+- [x] Resolve hostnames to IP addresses with visual feedback
+- [x] Display transfer progress with speed
+- [x] Handle transfer failures gracefully
 
 ### FR2: File Receiving
-- [ ] Start HTTP server on application launch
-- [ ] Display all local network addresses
-- [ ] Show pending transfer requests with file details
-- [ ] Accept or reject individual transfers
-- [ ] Save files to user-configured directory
-- [ ] Handle filename conflicts (append number)
+- [x] Start HTTP server on application launch
+- [x] Display local network addresses (with category filtering)
+- [x] Show pending transfer requests with file details
+- [x] Accept or reject individual transfers
+- [x] Batch accept/reject all pending transfers
+- [x] Cancel in-progress transfers
+- [x] Save files to user-configured directory
+- [ ] Handle filename conflicts (append number) — handled by engine
 
 ### FR3: Favorites Management
-- [ ] Save peer with custom name and address
-- [ ] List saved favorites in dropdown
-- [ ] Delete favorites
-- [ ] Auto-fill address when favorite selected
+- [x] Save peer with custom name and address
+- [x] List saved favorites in dropdown
+- [x] Delete favorites
+- [x] Auto-fill address when favorite selected
 
 ### FR4: Settings
-- [ ] Configure device name (shown to peers)
-- [ ] Set download directory
-- [ ] Manage trusted hosts list
-- [ ] Toggle receive-only mode
-- [ ] Select theme (system/light/dark)
-- [ ] Toggle notifications
+- [x] Configure device name (shown to peers)
+- [x] Set download directory
+- [x] Manage trusted hosts list
+- [x] Toggle receive-only mode
+- [x] Select theme (system/light/dark)
+- [x] Toggle notifications
+- [x] Configure retry behavior (max retries, delay)
+- [x] Filter interface categories (WiFi, Ethernet, VPN, Docker, Other)
 
 ### FR5: Transfer History
-- [ ] Record all completed/failed transfers
-- [ ] Display history with direction, peer, files, status
-- [ ] Persist history across sessions (max 100 entries)
+- [x] Record all completed/failed transfers — via engine
+- [ ] Display history with direction, peer, files, status — UI placeholder only
+- [x] Persist history across sessions (max 100 entries)
 
 ## Non-Functional Requirements
 
@@ -148,11 +153,14 @@
 
 Features supported by the engine but not yet exposed in the UI:
 
-1. **Directory sending**: Transfer entire folder structures
-2. **Batch operations**: Accept/reject multiple transfers at once
-3. **Transfer cancellation**: Stop in-progress transfers
-4. **Runtime port change**: Modify server port without restart
-5. **Peer health checks**: Verify connectivity before sending
+1. **Runtime port change**: Modify server port without restart
+2. **Peer health checks**: Verify connectivity before sending
+
+Previously planned features now implemented:
+- Directory sending (v2.0.3+)
+- Batch accept/reject (v2.0.3+)
+- Transfer cancellation (v2.0.3+)
+- Interface category filtering (unreleased)
 
 ## Timeline
 

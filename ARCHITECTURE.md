@@ -166,7 +166,7 @@ The window subscribes to engine events in `setup_engine_events()`:
 ## Configuration
 
 Configuration path determined by `directories::ProjectDirs::from("com", "gosh", "transfer")`:
-- Linux: `~/.config/gosh-transfer/`
+- Linux: `~/.config/gosh/transfer/`
 
 Files:
 | File | Format | Max Size |
@@ -180,7 +180,7 @@ Files:
 | Constant | Value | Location |
 |----------|-------|----------|
 | App ID | `com.gosh.Transfer` | `main.rs:12` |
-| Default port | 53317 | `types.rs:39` |
+| Default port | 53317 | `types.rs:151` |
 | Window size | 1024×768 | `window/imp.rs:19-20` |
 | Tokio workers | 2 | `engine_bridge.rs:62` |
 | Command channel | 32 | `engine_bridge.rs:56` |
@@ -205,14 +205,15 @@ The `gosh-lan-transfer` engine supports more features than currently exposed in 
 | Capability | Engine | GTK Frontend |
 |------------|--------|--------------|
 | Send files | ✓ | ✓ |
-| Send directories (preserving structure) | ✓ | ✗ |
+| Send directories (preserving structure) | ✓ | ✓ |
 | Accept/reject transfers | ✓ | ✓ |
-| Batch accept/reject | ✓ | ✗ |
-| Cancel mid-transfer | ✓ | ✗ |
+| Batch accept/reject | ✓ | ✓ |
+| Cancel mid-transfer | ✓ | ✓ |
 | Runtime port change | ✓ | ✗ |
 | Automatic retry with backoff | ✓ | ✓ (via engine) |
 | Progress tracking | ✓ | ✓ |
-| TransferRetry event | ✓ | ✗ (not handled) |
+| TransferRetry event | ✓ | ✓ |
 | Peer health checks | ✓ | ✗ |
+| Interface category filtering | N/A | ✓ |
 
-These represent potential future enhancements for the GTK frontend.
+Runtime port change and peer health checks represent potential future enhancements.

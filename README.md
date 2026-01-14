@@ -25,15 +25,18 @@ Gosh Transfer sends files between computers using explicit IP addresses or hostn
 
 ## Features
 
-- **Send files** to a specific IP/hostname with file picker
+- **Send files and directories** to a specific IP/hostname with file picker
 - **Receive files** with manual accept/reject for each transfer request
+- **Batch operations** to accept or reject all pending transfers at once
+- **Cancel transfers** mid-progress
 - **Real-time progress** with transfer speed display
 - **Favorites** for saving frequently-used peer addresses
 - **Trusted hosts** for auto-accepting transfers from specific IPs
+- **Interface filtering** to show/hide network interface types (WiFi, Ethernet, VPN, Docker)
 - **Receive-only mode** to disable sending
 - **Theme support** (dark/light/system)
 - **Transfer history** with persistent storage (up to 100 entries)
-- **Automatic retry** on network interruptions with exponential backoff
+- **Automatic retry** on network interruptions
 
 ## Technical Details
 
@@ -63,7 +66,7 @@ The transfer protocol is implemented in the [gosh-lan-transfer](https://github.c
 
 ### Data Storage
 
-Settings, favorites, and history are stored in `~/.config/gosh-transfer/`:
+Settings, favorites, and history are stored in `~/.config/gosh/transfer/`:
 
 | File | Purpose |
 |------|---------|
@@ -82,6 +85,12 @@ Settings, favorites, and history are stored in `~/.config/gosh-transfer/`:
 | `receiveOnly` | bool | false | Hides Send functionality |
 | `notificationsEnabled` | bool | true | System notifications toggle |
 | `theme` | string | "system" | "dark", "light", or "system" |
+| `maxRetries` | u32 | 3 | Retry attempts for failed transfers |
+| `retryDelayMs` | u64 | 1000 | Delay between retry attempts |
+| `interfaceFilters` | object | see below | Interface category visibility |
+
+**Interface Filters** (all boolean, defaults in parentheses):
+- `showWifi` (true), `showEthernet` (true), `showVpn` (true), `showDocker` (false), `showOther` (true)
 
 ## Building
 

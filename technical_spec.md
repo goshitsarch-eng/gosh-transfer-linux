@@ -102,13 +102,24 @@ gosh-transfer-linux/
 
 ```rust
 pub struct AppSettings {
-    pub port: u16,                    // Default: 53317
-    pub device_name: String,          // Default: hostname
-    pub download_dir: PathBuf,        // Default: ~/Downloads
-    pub trusted_hosts: Vec<String>,   // Auto-accept IPs
-    pub receive_only: bool,           // Disable sending
-    pub notifications_enabled: bool,  // System notifications
-    pub theme: String,                // "system", "light", "dark"
+    pub port: u16,                      // Default: 53317
+    pub device_name: String,            // Default: hostname
+    pub download_dir: PathBuf,          // Default: ~/Downloads
+    pub trusted_hosts: Vec<String>,     // Auto-accept IPs
+    pub receive_only: bool,             // Disable sending
+    pub notifications_enabled: bool,    // System notifications
+    pub theme: String,                  // "system", "light", "dark"
+    pub max_retries: u32,               // Default: 3
+    pub retry_delay_ms: u64,            // Default: 1000
+    pub interface_filters: InterfaceFilters, // Category visibility
+}
+
+pub struct InterfaceFilters {
+    pub show_wifi: bool,      // Default: true
+    pub show_ethernet: bool,  // Default: true
+    pub show_vpn: bool,       // Default: true
+    pub show_docker: bool,    // Default: false
+    pub show_other: bool,     // Default: true
 }
 ```
 
@@ -142,7 +153,7 @@ pub struct TransferRecord {
 
 ### Configuration Directory
 
-Location: `~/.config/gosh-transfer/` (via `directories` crate)
+Location: `~/.config/gosh/transfer/` (via `directories` crate with `ProjectDirs::from("com", "gosh", "transfer")`)
 
 | File | Purpose | Format | Limits |
 |------|---------|--------|--------|
