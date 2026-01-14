@@ -81,7 +81,7 @@ mod imp {
 
             let port_row = adw::SpinRow::with_range(1024.0, 65535.0, 1.0);
             port_row.set_title("Server Port");
-            port_row.set_subtitle("Port for receiving transfers");
+            port_row.set_subtitle("Port for file transfers");
             port_row.set_value(53317.0);
             device_group.add(&port_row);
             *self.port_row.borrow_mut() = Some(port_row);
@@ -152,8 +152,6 @@ mod imp {
             appearance_group.add(&notifications_row);
             *self.notifications_row.borrow_mut() = Some(notifications_row);
 
-            content.append(&appearance_group);
-
             // Trusted hosts
             let trusted_group = adw::PreferencesGroup::new();
             trusted_group.set_title("Trusted Hosts");
@@ -161,6 +159,8 @@ mod imp {
             *self.trusted_hosts_group.borrow_mut() = Some(trusted_group.clone());
 
             content.append(&trusted_group);
+
+            content.append(&appearance_group);
 
             scrolled.set_child(Some(&content));
             obj.append(&scrolled);

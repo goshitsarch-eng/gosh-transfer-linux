@@ -15,6 +15,8 @@ mod imp {
     #[derive(Default)]
     pub struct SendView {
         pub dest_row: RefCell<Option<adw::EntryRow>>,
+        pub resolution_label: RefCell<Option<gtk4::Label>>,
+        pub resolve_timeout: RefCell<Option<glib::SourceId>>,
         pub test_button: RefCell<Option<gtk4::Button>>,
         pub test_spinner: RefCell<Option<gtk4::Spinner>>,
         pub favorites_dropdown: RefCell<Option<adw::ComboRow>>,
@@ -131,12 +133,24 @@ mod imp {
             dest_card.add(&dest_row);
             *self.dest_row.borrow_mut() = Some(dest_row.clone());
 
-            // Connect to update send button state
+            // Resolution status label (below address input)
+            let resolution_label = gtk4::Label::new(None);
+            resolution_label.set_halign(gtk4::Align::Start);
+            resolution_label.set_margin_start(12);
+            resolution_label.set_margin_top(4);
+            resolution_label.add_css_class("dim-label");
+            resolution_label.add_css_class("caption");
+            resolution_label.set_visible(false);
+            dest_card.add(&resolution_label);
+            *self.resolution_label.borrow_mut() = Some(resolution_label);
+
+            // Connect to update send button state and trigger resolution
             dest_row.connect_changed(glib::clone!(
                 #[weak(rename_to = this)]
                 self,
                 move |_| {
                     this.update_send_button_state();
+                    this.schedule_address_resolution();
                 }
             ));
 
@@ -242,6 +256,85 @@ mod imp {
 
             if let Some(button) = self.send_button.borrow().as_ref() {
                 button.set_sensitive(has_dest && (has_files || has_directory));
+            }
+        }
+
+        fn schedule_address_resolution(&self) {
+            // Cancel any pending resolution
+            if let Some(source_id) = self.resolve_timeout.borrow_mut().take() {
+                source_id.remove();
+            }
+
+            let address = self
+                .dest_row
+                .borrow()
+                .as_ref()
+                .map(|r| r.text().to_string())
+                .unwrap_or_default();
+
+            // Clear label if address is empty
+            if address.is_empty() {
+                if let Some(label) = self.resolution_label.borrow().as_ref() {
+                    label.set_visible(false);
+                }
+                return;
+            }
+
+            // Show "Resolving..." immediately
+            if let Some(label) = self.resolution_label.borrow().as_ref() {
+                label.set_text("Resolving...");
+                label.remove_css_class("success");
+                label.remove_css_class("error");
+                label.set_visible(true);
+            }
+
+            // Schedule resolution with 300ms debounce
+            let source_id = glib::timeout_add_local_once(
+                std::time::Duration::from_millis(300),
+                glib::clone!(
+                    #[weak(rename_to = this)]
+                    self,
+                    move || {
+                        this.resolve_timeout.borrow_mut().take();
+                        this.resolve_address();
+                    }
+                ),
+            );
+            *self.resolve_timeout.borrow_mut() = Some(source_id);
+        }
+
+        fn resolve_address(&self) {
+            let obj = self.obj();
+            if let Some(app) = obj.get_app() {
+                let address = self
+                    .dest_row
+                    .borrow()
+                    .as_ref()
+                    .map(|r| r.text().to_string())
+                    .unwrap_or_default();
+
+                if address.is_empty() {
+                    return;
+                }
+
+                let resolution_label = self.resolution_label.borrow().clone();
+
+                app.engine_bridge().resolve_address(address, move |result| {
+                    if let Some(label) = resolution_label.as_ref() {
+                        if result.success && !result.ips.is_empty() {
+                            let ip = &result.ips[0];
+                            label.set_text(&format!("Resolved to {}", ip));
+                            label.remove_css_class("error");
+                            label.add_css_class("success");
+                        } else {
+                            let error_msg = result.error.as_deref().unwrap_or("Could not resolve hostname");
+                            label.set_text(error_msg);
+                            label.remove_css_class("success");
+                            label.add_css_class("error");
+                        }
+                        label.set_visible(true);
+                    }
+                });
             }
         }
 

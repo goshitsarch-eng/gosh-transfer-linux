@@ -92,15 +92,7 @@ mod imp {
 
             content.append(&status_card);
 
-            // Your Addresses card
-            let addresses_card = adw::PreferencesGroup::new();
-            addresses_card.set_title("Your Addresses");
-            addresses_card.set_description(Some("Share one of these with the sender"));
-            *self.addresses_card.borrow_mut() = Some(addresses_card.clone());
-
-            content.append(&addresses_card);
-
-            // Pending transfers card
+            // Pending transfers card (above addresses for quicker access)
             let pending_card = adw::PreferencesGroup::new();
             pending_card.set_title("Pending Transfers");
             pending_card.set_description(Some("Incoming transfer requests will appear here"));
@@ -146,6 +138,14 @@ mod imp {
             *self.pending_card.borrow_mut() = Some(pending_card.clone());
 
             content.append(&pending_card);
+
+            // Your Addresses card
+            let addresses_card = adw::PreferencesGroup::new();
+            addresses_card.set_title("Your Addresses");
+            addresses_card.set_description(Some("Share one of these with the sender"));
+            *self.addresses_card.borrow_mut() = Some(addresses_card.clone());
+
+            content.append(&addresses_card);
 
             // Active transfers card
             let active_card = adw::PreferencesGroup::new();

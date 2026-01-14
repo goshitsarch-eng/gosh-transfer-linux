@@ -88,7 +88,7 @@ mod imp {
             obj.append(&license);
 
             // Copyright
-            let copyright = gtk4::Label::new(Some("Copyright (c) 2024 Gosh Contributors"));
+            let copyright = gtk4::Label::new(Some("Copyright (c) 2026 Goshitsarch"));
             copyright.add_css_class("dim-label");
             copyright.add_css_class("caption");
             obj.append(&copyright);
