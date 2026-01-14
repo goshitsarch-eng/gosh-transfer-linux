@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Network interface category filtering in Settings (WiFi, Ethernet, VPN, Docker, Other)
 - Real-time hostname resolution feedback in send view with visual status
 
 ### Changed
