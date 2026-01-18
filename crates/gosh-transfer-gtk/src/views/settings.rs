@@ -3,9 +3,9 @@
 
 use crate::application::GoshTransferApplication;
 use gosh_transfer_core::{AppSettings, InterfaceFilters};
+use gtk4::gio;
 use gtk4::prelude::*;
 use gtk4::subclass::prelude::*;
-use gtk4::gio;
 use libadwaita as adw;
 use libadwaita::prelude::*;
 use std::cell::RefCell;
@@ -163,7 +163,8 @@ mod imp {
             // Network Interface Filters
             let interface_group = adw::PreferencesGroup::new();
             interface_group.set_title("Network Interfaces");
-            interface_group.set_description(Some("Choose which interface types to show in Receive"));
+            interface_group
+                .set_description(Some("Choose which interface types to show in Receive"));
 
             let wifi_row = adw::SwitchRow::new();
             wifi_row.set_title("WiFi");
@@ -399,9 +400,15 @@ mod imp {
                 if let Err(e) = app.settings_store().update(new_settings) {
                     tracing::error!("Failed to save settings: {}", e);
                     // Show error toast
-                    if let Some(window) = obj.root().and_then(|r| r.downcast::<adw::ApplicationWindow>().ok()) {
+                    if let Some(window) = obj
+                        .root()
+                        .and_then(|r| r.downcast::<adw::ApplicationWindow>().ok())
+                    {
                         let toast = adw::Toast::new("Failed to save settings");
-                        if let Some(overlay) = window.content().and_then(|c| c.downcast::<adw::ToastOverlay>().ok()) {
+                        if let Some(overlay) = window
+                            .content()
+                            .and_then(|c| c.downcast::<adw::ToastOverlay>().ok())
+                        {
                             overlay.add_toast(toast);
                         }
                     }
@@ -413,9 +420,15 @@ mod imp {
                     app.engine_bridge().update_config(engine_config);
 
                     // Show success toast
-                    if let Some(window) = obj.root().and_then(|r| r.downcast::<adw::ApplicationWindow>().ok()) {
+                    if let Some(window) = obj
+                        .root()
+                        .and_then(|r| r.downcast::<adw::ApplicationWindow>().ok())
+                    {
                         let toast = adw::Toast::new("Settings saved");
-                        if let Some(overlay) = window.content().and_then(|c| c.downcast::<adw::ToastOverlay>().ok()) {
+                        if let Some(overlay) = window
+                            .content()
+                            .and_then(|c| c.downcast::<adw::ToastOverlay>().ok())
+                        {
                             overlay.add_toast(toast);
                         }
 
@@ -437,15 +450,15 @@ mod imp {
                                 (false, false) => unreachable!(),
                             };
 
-                            let dialog = adw::MessageDialog::new(
-                                Some(&window),
-                                Some(title),
-                                Some(body),
-                            );
+                            let dialog =
+                                adw::MessageDialog::new(Some(&window), Some(title), Some(body));
 
                             dialog.add_response("dismiss", "Dismiss");
                             dialog.add_response("restart", "Quit and Reopen");
-                            dialog.set_response_appearance("restart", adw::ResponseAppearance::Suggested);
+                            dialog.set_response_appearance(
+                                "restart",
+                                adw::ResponseAppearance::Suggested,
+                            );
                             dialog.set_default_response(Some("dismiss"));
 
                             dialog.connect_response(None, move |_, response| {

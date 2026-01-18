@@ -22,10 +22,7 @@ fn main() -> glib::ExitCode {
         )
         .init();
 
-    tracing::info!(
-        "Starting Gosh Transfer GTK v{}",
-        env!("CARGO_PKG_VERSION")
-    );
+    tracing::info!("Starting Gosh Transfer GTK v{}", env!("CARGO_PKG_VERSION"));
 
     // Create and run application
     let app = application::GoshTransferApplication::new(APP_ID);

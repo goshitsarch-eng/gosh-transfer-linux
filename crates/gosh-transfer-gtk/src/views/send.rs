@@ -380,11 +380,16 @@ mod imp {
                             label.add_css_class("success");
 
                             // Update favorite's last_resolved_ip if this address is a favorite
-                            if let Err(e) = favorites_store.update_resolved_ip(&address_for_update, ip) {
+                            if let Err(e) =
+                                favorites_store.update_resolved_ip(&address_for_update, ip)
+                            {
                                 tracing::debug!("Could not update resolved IP for favorite: {}", e);
                             }
                         } else {
-                            let error_msg = result.error.as_deref().unwrap_or("Could not resolve hostname");
+                            let error_msg = result
+                                .error
+                                .as_deref()
+                                .unwrap_or("Could not resolve hostname");
                             label.set_text(error_msg);
                             label.remove_css_class("success");
                             label.add_css_class("error");
@@ -529,36 +534,37 @@ mod imp {
                 let test_button = self.test_button.borrow().clone();
                 let test_spinner = self.test_spinner.borrow().clone();
 
-                app.engine_bridge().check_peer(address, port, move |reachable| {
-                    // Hide spinner
-                    if let Some(spinner) = test_spinner.as_ref() {
-                        spinner.stop();
-                        spinner.set_visible(false);
-                    }
-                    if let Some(button) = test_button.as_ref() {
-                        button.set_sensitive(true);
-                        if reachable {
-                            button.set_icon_name("emblem-ok-symbolic");
-                            button.add_css_class("success");
-                        } else {
-                            button.set_icon_name("dialog-error-symbolic");
-                            button.add_css_class("error");
+                app.engine_bridge()
+                    .check_peer(address, port, move |reachable| {
+                        // Hide spinner
+                        if let Some(spinner) = test_spinner.as_ref() {
+                            spinner.stop();
+                            spinner.set_visible(false);
                         }
-                        // Reset icon after 3 seconds
-                        glib::timeout_add_seconds_local_once(
-                            3,
-                            glib::clone!(
-                                #[weak]
-                                button,
-                                move || {
-                                    button.set_icon_name("network-transmit-symbolic");
-                                    button.remove_css_class("success");
-                                    button.remove_css_class("error");
-                                }
-                            ),
-                        );
-                    }
-                });
+                        if let Some(button) = test_button.as_ref() {
+                            button.set_sensitive(true);
+                            if reachable {
+                                button.set_icon_name("emblem-ok-symbolic");
+                                button.add_css_class("success");
+                            } else {
+                                button.set_icon_name("dialog-error-symbolic");
+                                button.add_css_class("error");
+                            }
+                            // Reset icon after 3 seconds
+                            glib::timeout_add_seconds_local_once(
+                                3,
+                                glib::clone!(
+                                    #[weak]
+                                    button,
+                                    move || {
+                                        button.set_icon_name("network-transmit-symbolic");
+                                        button.remove_css_class("success");
+                                        button.remove_css_class("error");
+                                    }
+                                ),
+                            );
+                        }
+                    });
             }
         }
 

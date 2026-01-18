@@ -14,6 +14,8 @@ mod imp {
     use super::*;
     use std::cell::RefCell;
 
+    pub type PendingHandledCallback = Option<Box<dyn Fn(&[String]) + 'static>>;
+
     pub struct ActiveTransferRow {
         pub row: adw::ActionRow,
         pub progress_bar: gtk4::ProgressBar,
@@ -33,6 +35,7 @@ mod imp {
         pub active_card: RefCell<Option<adw::PreferencesGroup>>,
         pub empty_active_row: RefCell<Option<adw::ActionRow>>,
         pub active_rows: RefCell<HashMap<String, ActiveTransferRow>>,
+        pub on_pending_handled: RefCell<PendingHandledCallback>,
     }
 
     #[glib::object_subclass]
@@ -177,6 +180,21 @@ impl ReceiveView {
         glib::Object::new()
     }
 
+    /// Set callback for when pending transfers are manually handled by the user
+    pub fn set_on_pending_handled<F>(&self, callback: F)
+    where
+        F: Fn(&[String]) + 'static,
+    {
+        *self.imp().on_pending_handled.borrow_mut() = Some(Box::new(callback));
+    }
+
+    /// Notify that transfers were handled manually by the user
+    fn notify_pending_handled(&self, ids: &[String]) {
+        if let Some(callback) = self.imp().on_pending_handled.borrow().as_ref() {
+            callback(ids);
+        }
+    }
+
     /// Load initial data from the application
     pub fn load_data(&self, app: &GoshTransferApplication) {
         let imp = self.imp();
@@ -298,6 +316,7 @@ impl ReceiveView {
                 if let Some(app) = app_weak.upgrade() {
                     app.engine_bridge().accept_transfer(transfer_id.clone());
                     view.remove_pending_transfer(&transfer_id);
+                    view.notify_pending_handled(std::slice::from_ref(&transfer_id));
                 }
             }
         ));
@@ -317,6 +336,7 @@ impl ReceiveView {
                 if let Some(app) = app_weak.upgrade() {
                     app.engine_bridge().reject_transfer(transfer_id.clone());
                     view.remove_pending_transfer(&transfer_id);
+                    view.notify_pending_handled(std::slice::from_ref(&transfer_id));
                 }
             }
         ));
@@ -328,7 +348,9 @@ impl ReceiveView {
         }
 
         // Store reference
-        imp.pending_rows.borrow_mut().insert(transfer.id.clone(), row);
+        imp.pending_rows
+            .borrow_mut()
+            .insert(transfer.id.clone(), row);
 
         // Update batch buttons visibility
         self.update_batch_buttons_visibility();
@@ -387,16 +409,20 @@ impl ReceiveView {
     /// Accept all pending transfers
     fn accept_all_transfers(&self) {
         if let Some(app) = self.get_app() {
+            let ids: Vec<String> = self.imp().pending_rows.borrow().keys().cloned().collect();
             app.engine_bridge().accept_all_transfers();
             self.clear_pending_transfers();
+            self.notify_pending_handled(&ids);
         }
     }
 
     /// Reject all pending transfers
     fn reject_all_transfers(&self) {
         if let Some(app) = self.get_app() {
+            let ids: Vec<String> = self.imp().pending_rows.borrow().keys().cloned().collect();
             app.engine_bridge().reject_all_transfers();
             self.clear_pending_transfers();
+            self.notify_pending_handled(&ids);
         }
     }
 
@@ -408,7 +434,12 @@ impl ReceiveView {
     }
 
     /// Add an active transfer (when accepted)
-    pub fn add_active_transfer(&self, transfer_id: &str, title: &str, app: &GoshTransferApplication) {
+    pub fn add_active_transfer(
+        &self,
+        transfer_id: &str,
+        title: &str,
+        app: &GoshTransferApplication,
+    ) {
         let imp = self.imp();
 
         // Skip if already exists
@@ -472,7 +503,13 @@ impl ReceiveView {
     }
 
     /// Update transfer progress
-    pub fn update_transfer_progress(&self, transfer_id: &str, bytes_transferred: u64, total_bytes: u64, speed_bps: u64) {
+    pub fn update_transfer_progress(
+        &self,
+        transfer_id: &str,
+        bytes_transferred: u64,
+        total_bytes: u64,
+        speed_bps: u64,
+    ) {
         let imp = self.imp();
 
         if let Some(active) = imp.active_rows.borrow().get(transfer_id) {
@@ -490,7 +527,10 @@ impl ReceiveView {
             let total_str = format_size(total_bytes);
 
             active.status_label.set_text(&format!("{}%", percent));
-            active.row.set_subtitle(&format!("{} / {} - {}", transferred_str, total_str, speed_str));
+            active.row.set_subtitle(&format!(
+                "{} / {} - {}",
+                transferred_str, total_str, speed_str
+            ));
         }
     }
 
@@ -499,7 +539,9 @@ impl ReceiveView {
         let imp = self.imp();
 
         if let Some(active) = imp.active_rows.borrow().get(transfer_id) {
-            active.status_label.set_text(&format!("Retry {}/{}", attempt, max_attempts));
+            active
+                .status_label
+                .set_text(&format!("Retry {}/{}", attempt, max_attempts));
         }
     }
 

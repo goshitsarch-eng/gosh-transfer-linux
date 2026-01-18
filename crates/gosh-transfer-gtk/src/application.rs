@@ -4,9 +4,9 @@
 use crate::services::EngineBridge;
 use crate::window::GoshTransferWindow;
 use gosh_transfer_core::{AppSettings, FileFavoritesStore, SettingsStore, TransferHistory};
+use gtk4::gio;
 use gtk4::prelude::*;
 use gtk4::subclass::prelude::ObjectSubclassIsExt;
-use gtk4::gio;
 use libadwaita as adw;
 use std::cell::OnceCell;
 use std::sync::Arc;

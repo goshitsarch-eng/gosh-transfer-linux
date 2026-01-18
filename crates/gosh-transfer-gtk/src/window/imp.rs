@@ -225,10 +225,9 @@ impl GoshTransferWindow {
                     }
                     "#,
                 );
-                badge.style_context().add_provider(
-                    &css_provider,
-                    gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
-                );
+                badge
+                    .style_context()
+                    .add_provider(&css_provider, gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION);
                 badge.add_css_class("notification-badge");
 
                 hbox.append(&badge);
@@ -356,11 +355,47 @@ impl GoshTransferWindow {
         let app_weak = app.downgrade();
 
         // Track pending transfers for title lookup and badge state
-        let pending_info: std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, String>>> =
-            std::rc::Rc::new(std::cell::RefCell::new(std::collections::HashMap::new()));
+        let pending_info: std::rc::Rc<
+            std::cell::RefCell<std::collections::HashMap<String, String>>,
+        > = std::rc::Rc::new(std::cell::RefCell::new(std::collections::HashMap::new()));
         // Track which transfers have been converted to active (to avoid double badge decrement)
         let active_transfers: std::rc::Rc<std::cell::RefCell<std::collections::HashSet<String>>> =
             std::rc::Rc::new(std::cell::RefCell::new(std::collections::HashSet::new()));
+        // Track which transfers were manually handled by the user (to avoid double badge decrement)
+        let ui_handled_transfers: std::rc::Rc<
+            std::cell::RefCell<std::collections::HashSet<String>>,
+        > = std::rc::Rc::new(std::cell::RefCell::new(std::collections::HashSet::new()));
+
+        // Wire up callback for when user manually accepts/rejects transfers
+        if let Some(view) = receive_view.as_ref() {
+            let pending_count_clone = pending_count.clone();
+            let receive_badge_clone = receive_badge.clone();
+            let pending_info_clone = pending_info.clone();
+            let ui_handled_clone = ui_handled_transfers.clone();
+
+            view.set_on_pending_handled(move |ids| {
+                let count = ids.len() as u32;
+                let current = pending_count_clone.get();
+                let new_count = current.saturating_sub(count);
+                pending_count_clone.set(new_count);
+
+                if let Some(badge) = receive_badge_clone.as_ref() {
+                    if new_count > 0 {
+                        badge.set_text(&new_count.to_string());
+                    } else {
+                        badge.set_visible(false);
+                    }
+                }
+
+                // Remove from pending_info and mark as handled
+                let mut info = pending_info_clone.borrow_mut();
+                let mut handled = ui_handled_clone.borrow_mut();
+                for id in ids {
+                    info.remove(id);
+                    handled.insert(id.clone());
+                }
+            });
+        }
 
         glib::spawn_future_local(glib::clone!(
             #[strong]
@@ -369,19 +404,22 @@ impl GoshTransferWindow {
             pending_count,
             #[strong]
             active_transfers,
+            #[strong]
+            ui_handled_transfers,
             async move {
                 // Helper to decrement badge
-                let decrement_badge = |count: &std::cell::Cell<u32>, badge: &Option<gtk4::Label>| {
-                    let new_count = count.get().saturating_sub(1);
-                    count.set(new_count);
-                    if let Some(b) = badge.as_ref() {
-                        if new_count > 0 {
-                            b.set_text(&new_count.to_string());
-                        } else {
-                            b.set_visible(false);
+                let decrement_badge =
+                    |count: &std::cell::Cell<u32>, badge: &Option<gtk4::Label>| {
+                        let new_count = count.get().saturating_sub(1);
+                        count.set(new_count);
+                        if let Some(b) = badge.as_ref() {
+                            if new_count > 0 {
+                                b.set_text(&new_count.to_string());
+                            } else {
+                                b.set_visible(false);
+                            }
                         }
-                    }
-                };
+                    };
 
                 while let Ok(event) = event_rx.recv().await {
                     let Some(app) = app_weak.upgrade() else {
@@ -423,9 +461,16 @@ impl GoshTransferWindow {
                             // Check if this is a new active transfer (first progress event)
                             let is_new = !active_transfers.borrow().contains(&progress.transfer_id);
                             if is_new {
-                                active_transfers.borrow_mut().insert(progress.transfer_id.clone());
-                                // Decrement badge since it's no longer pending
-                                decrement_badge(&pending_count, &receive_badge);
+                                active_transfers
+                                    .borrow_mut()
+                                    .insert(progress.transfer_id.clone());
+                                // Only decrement badge if not already handled by UI action
+                                if !ui_handled_transfers
+                                    .borrow()
+                                    .contains(&progress.transfer_id)
+                                {
+                                    decrement_badge(&pending_count, &receive_badge);
+                                }
                             }
 
                             if let Some(view) = receive_view.as_ref() {
@@ -450,6 +495,7 @@ impl GoshTransferWindow {
                             tracing::info!("Transfer completed: {}", transfer_id);
                             pending_info.borrow_mut().remove(&transfer_id);
                             active_transfers.borrow_mut().remove(&transfer_id);
+                            ui_handled_transfers.borrow_mut().remove(&transfer_id);
 
                             if let Some(view) = receive_view.as_ref() {
                                 view.remove_pending_transfer(&transfer_id);
@@ -465,12 +511,16 @@ impl GoshTransferWindow {
                             tracing::error!("Transfer failed: {} - {}", transfer_id, error);
 
                             // If it failed while still pending (not yet active), decrement badge
-                            if !active_transfers.borrow().contains(&transfer_id) {
+                            // but only if not already handled by UI action
+                            if !active_transfers.borrow().contains(&transfer_id)
+                                && !ui_handled_transfers.borrow().contains(&transfer_id)
+                            {
                                 decrement_badge(&pending_count, &receive_badge);
                             }
 
                             pending_info.borrow_mut().remove(&transfer_id);
                             active_transfers.borrow_mut().remove(&transfer_id);
+                            ui_handled_transfers.borrow_mut().remove(&transfer_id);
 
                             if let Some(view) = receive_view.as_ref() {
                                 view.remove_pending_transfer(&transfer_id);

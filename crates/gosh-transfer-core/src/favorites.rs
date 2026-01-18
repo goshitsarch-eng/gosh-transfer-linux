@@ -30,8 +30,9 @@ impl FileFavoritesStore {
             let content = fs::read_to_string(&file_path)
                 .map_err(|e| AppError::FileIo(format!("Failed to read favorites: {}", e)))?;
 
-            let file: FavoritesFile = serde_json::from_str(&content)
-                .map_err(|e| AppError::Serialization(format!("Failed to parse favorites: {}", e)))?;
+            let file: FavoritesFile = serde_json::from_str(&content).map_err(|e| {
+                AppError::Serialization(format!("Failed to parse favorites: {}", e))
+            })?;
 
             file.favorites
         } else {
@@ -65,8 +66,9 @@ impl FileFavoritesStore {
             favorites: favorites.clone(),
         };
 
-        let content = serde_json::to_string_pretty(&file)
-            .map_err(|e| AppError::Serialization(format!("Failed to serialize favorites: {}", e)))?;
+        let content = serde_json::to_string_pretty(&file).map_err(|e| {
+            AppError::Serialization(format!("Failed to serialize favorites: {}", e))
+        })?;
 
         fs::write(&self.file_path, content)
             .map_err(|e| AppError::FileIo(format!("Failed to write favorites: {}", e)))?;
@@ -117,15 +119,9 @@ impl FavoritesPersistence for FileFavoritesStore {
     ) -> EngineResult<Favorite> {
         let updated = {
             let mut favorites = self.favorites.write().unwrap();
-            let favorite = favorites
-                .iter_mut()
-                .find(|f| f.id == id)
-                .ok_or_else(|| {
-                    gosh_lan_transfer::EngineError::InvalidConfig(format!(
-                        "Favorite not found: {}",
-                        id
-                    ))
-                })?;
+            let favorite = favorites.iter_mut().find(|f| f.id == id).ok_or_else(|| {
+                gosh_lan_transfer::EngineError::InvalidConfig(format!("Favorite not found: {}", id))
+            })?;
 
             if let Some(name) = name {
                 favorite.name = name;

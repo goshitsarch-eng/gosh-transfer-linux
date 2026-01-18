@@ -5,8 +5,7 @@
 
 use async_channel::{Receiver, Sender};
 use gosh_lan_transfer::{
-    EngineConfig, EngineEvent, GoshTransferEngine, NetworkInterface, PendingTransfer,
-    ResolveResult,
+    EngineConfig, EngineEvent, GoshTransferEngine, NetworkInterface, PendingTransfer, ResolveResult,
 };
 use std::path::PathBuf;
 use std::sync::Arc;

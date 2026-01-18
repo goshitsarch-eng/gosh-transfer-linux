@@ -65,7 +65,7 @@ mod imp {
 
             // Description
             let desc = gtk4::Label::new(Some(
-                "A clean, explicit file transfer application.\nNo cloud. No sync. Just transfer."
+                "A clean, explicit file transfer application.\nNo cloud. No sync. Just transfer.",
             ));
             desc.set_justify(gtk4::Justification::Center);
             desc.add_css_class("body");
@@ -75,15 +75,13 @@ mod imp {
             let links_box = gtk4::Box::new(gtk4::Orientation::Horizontal, 12);
             links_box.set_halign(gtk4::Align::Center);
 
-            let website_btn = gtk4::LinkButton::with_label(
-                "https://github.com/gosh-sh/gosh-transfer",
-                "Website"
-            );
+            let website_btn =
+                gtk4::LinkButton::with_label("https://github.com/gosh-sh/gosh-transfer", "Website");
             links_box.append(&website_btn);
 
             let issues_btn = gtk4::LinkButton::with_label(
                 "https://github.com/gosh-sh/gosh-transfer/issues",
-                "Report Issue"
+                "Report Issue",
             );
             links_box.append(&issues_btn);
 

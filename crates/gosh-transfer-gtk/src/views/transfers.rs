@@ -217,7 +217,7 @@ fn create_history_row(record: &TransferRecord) -> adw::ActionRow {
             icon.add_css_class("error");
             icon
         }
-        _ => gtk4::Image::from_icon_name("content-loading-symbolic")
+        _ => gtk4::Image::from_icon_name("content-loading-symbolic"),
     };
     row.add_suffix(&status_icon);
 
