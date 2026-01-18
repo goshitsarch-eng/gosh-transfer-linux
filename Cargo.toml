@@ -10,7 +10,7 @@ version = "2.1.0"
 edition = "2021"
 license = "AGPL-3.0"
 authors = ["Goshitsarch"]
-repository = "https://github.com/gosh-sh/gosh-transfer"
+repository = "https://github.com/goshitsarch-eng/gosh-transfer-linux"
 description = "A clean, explicit file transfer application"
 
 [workspace.dependencies]

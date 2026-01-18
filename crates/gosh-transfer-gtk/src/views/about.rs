@@ -76,11 +76,11 @@ mod imp {
             links_box.set_halign(gtk4::Align::Center);
 
             let website_btn =
-                gtk4::LinkButton::with_label("https://github.com/gosh-sh/gosh-transfer", "Website");
+                gtk4::LinkButton::with_label("https://github.com/goshitsarch-eng/gosh-transfer-linux", "Website");
             links_box.append(&website_btn);
 
             let issues_btn = gtk4::LinkButton::with_label(
-                "https://github.com/gosh-sh/gosh-transfer/issues",
+                "https://github.com/goshitsarch-eng/gosh-transfer-linux/issues",
                 "Report Issue",
             );
             links_box.append(&issues_btn);
