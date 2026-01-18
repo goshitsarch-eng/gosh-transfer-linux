@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-01-17
+
 ### Added
 - Transfer history display in Transfers view with direction icons, file info, size, status, and relative timestamps
 - Last resolved IP display for favorites (shown when selecting a favorite with a different resolved IP)
