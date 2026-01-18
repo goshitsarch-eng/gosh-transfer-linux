@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0
 // Gosh Transfer GTK - About View
 
+use gdk_pixbuf::PixbufLoader;
+use gtk4::gdk::Texture;
 use gtk4::prelude::*;
 use gtk4::subclass::prelude::*;
 
@@ -40,7 +42,13 @@ mod imp {
             obj.set_valign(gtk4::Align::Center);
 
             // Logo
-            let logo = gtk4::Image::from_icon_name("folder-download-symbolic");
+            let icon_bytes = include_bytes!("../../../../assets/icons/128x128.png");
+            let loader = PixbufLoader::new();
+            loader.write(icon_bytes).expect("Failed to load logo");
+            loader.close().expect("Failed to close loader");
+            let pixbuf = loader.pixbuf().expect("Failed to get pixbuf");
+            let texture = Texture::for_pixbuf(&pixbuf);
+            let logo = gtk4::Image::from_paintable(Some(&texture));
             logo.set_pixel_size(128);
             logo.add_css_class("icon-dropshadow");
             obj.append(&logo);

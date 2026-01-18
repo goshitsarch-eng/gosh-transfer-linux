@@ -20,6 +20,7 @@ gtk4.workspace = true
 libadwaita.workspace = true
 glib.workspace = true
 gio.workspace = true
+gdk-pixbuf.workspace = true
 
 # Async runtime and GTK bridge
 tokio.workspace = true
