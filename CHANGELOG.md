@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.2] - 2026-01-17
+
+### Fixed
+- Fixed favorites selection not working when clicking an already-selected favorite
+- Added "Manage Favorites" dialog to delete saved favorites
+- Added crash prevention for folder send operations
+
 ## [2.1.1] - 2026-01-17
 
 ### Fixed
