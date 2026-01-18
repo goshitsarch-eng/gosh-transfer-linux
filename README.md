@@ -16,8 +16,6 @@ Save frequently-used peers as favorites for quick access, or add trusted hosts t
 
 ## Screenshots
 
-> **Note**: Screenshots below are from an earlier version and will be updated to show the current GTK4/Libadwaita interface.
-
 ![Screenshot 1](screenshots/img1.png)
 ![Screenshot 2](screenshots/img2.png)
 ![Screenshot 3](screenshots/img3.png)
