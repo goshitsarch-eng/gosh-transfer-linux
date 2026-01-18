@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.gosh.Transfer</id>
+  <name>Gosh Transfer</name>
+  <summary>Simple, explicit file transfers over LAN, Tailscale, and VPNs</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
+  <developer id="com.gosh">
+    <name>Goshitsarch</name>
+  </developer>
+
+  <description>
+    <p>
+      Gosh Transfer is a clean, explicit file transfer application for sending
+      and receiving files over local networks, Tailscale, and VPNs. Unlike
+      automatic discovery tools, Gosh Transfer requires you to explicitly
+      specify the recipient's IP address, giving you full control over your
+      file transfers.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Send files to any device on your network by IP address</li>
+      <li>Receive files from other Gosh Transfer users</li>
+      <li>Works seamlessly over LAN, Tailscale, and VPN connections</li>
+      <li>Transfer history with detailed logs</li>
+      <li>Favorite addresses for quick access</li>
+      <li>Native GTK4/Libadwaita interface</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">com.gosh.Transfer.desktop</launchable>
+
+  <url type="homepage">https://github.com/gosh-sh/gosh-transfer</url>
+  <url type="bugtracker">https://github.com/gosh-sh/gosh-transfer/issues</url>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Send files to another device</caption>
+      <image>https://raw.githubusercontent.com/gosh-sh/gosh-transfer/main/screenshots/img1.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Receive files from other users</caption>
+      <image>https://raw.githubusercontent.com/gosh-sh/gosh-transfer/main/screenshots/img2.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>View transfer history</caption>
+      <image>https://raw.githubusercontent.com/gosh-sh/gosh-transfer/main/screenshots/img3.png</image>
+    </screenshot>
+  </screenshots>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#3584e4</color>
+    <color type="primary" scheme_preference="dark">#1a5fb4</color>
+  </branding>
+
+  <content_rating type="oars-1.1" />
+
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+
+  <recommends>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </recommends>
+
+  <releases>
+    <release version="2.1.0" date="2025-01-17">
+      <description>
+        <p>Improved UI and stability enhancements.</p>
+      </description>
+    </release>
+  </releases>
+</component>

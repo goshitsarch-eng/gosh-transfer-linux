@@ -1,0 +1,36 @@
+app-id: com.gosh.Transfer
+runtime: org.gnome.Platform
+runtime-version: '46'
+sdk: org.gnome.Sdk
+command: gosh-transfer-gtk
+finish-args:
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --share=network
+  - --device=dri
+  - --filesystem=home
+
+modules:
+  - name: gosh-transfer
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 gosh-transfer-gtk /app/bin/gosh-transfer-gtk
+      - install -Dm644 com.gosh.Transfer.desktop /app/share/applications/com.gosh.Transfer.desktop
+      - install -Dm644 com.gosh.Transfer.metainfo.xml /app/share/metainfo/com.gosh.Transfer.metainfo.xml
+      - install -Dm644 icon-32.png /app/share/icons/hicolor/32x32/apps/com.gosh.Transfer.png
+      - install -Dm644 icon-128.png /app/share/icons/hicolor/128x128/apps/com.gosh.Transfer.png
+      - install -Dm644 icon-256.png /app/share/icons/hicolor/256x256/apps/com.gosh.Transfer.png
+    sources:
+      - type: file
+        path: gosh-transfer-gtk
+      - type: file
+        path: com.gosh.Transfer.desktop
+      - type: file
+        path: com.gosh.Transfer.metainfo.xml
+      - type: file
+        path: icon-32.png
+      - type: file
+        path: icon-128.png
+      - type: file
+        path: icon-256.png

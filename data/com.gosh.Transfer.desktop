@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Gosh Transfer
+GenericName=File Transfer
+Comment=Simple, explicit file transfers over LAN, Tailscale, and VPNs
+Exec=gosh-transfer-gtk
+Icon=com.gosh.Transfer
+Terminal=false
+Type=Application
+Categories=Utility;Network;FileTransfer;GTK;
+Keywords=transfer;file;send;receive;network;lan;
+StartupNotify=true

@@ -37,3 +37,39 @@ tracing-subscriber.workspace = true
 
 [build-dependencies]
 glib-build-tools = "0.20"
+
+[package.metadata.deb]
+maintainer = "Goshitsarch <noreply@gosh.sh>"
+copyright = "2025, Goshitsarch"
+license-file = ["../../LICENSE", "0"]
+extended-description = """\
+Gosh Transfer is a clean, explicit file transfer application for sending \
+and receiving files over local networks, Tailscale, and VPNs. Unlike \
+automatic discovery tools, Gosh Transfer requires you to explicitly \
+specify the recipient's IP address, giving you full control over your \
+file transfers."""
+section = "net"
+priority = "optional"
+depends = "$auto"
+assets = [
+    ["target/release/gosh-transfer-gtk", "usr/bin/", "755"],
+    ["../../data/com.gosh.Transfer.desktop", "usr/share/applications/", "644"],
+    ["../../data/com.gosh.Transfer.metainfo.xml", "usr/share/metainfo/", "644"],
+    ["../../assets/icons/32x32.png", "usr/share/icons/hicolor/32x32/apps/com.gosh.Transfer.png", "644"],
+    ["../../assets/icons/128x128.png", "usr/share/icons/hicolor/128x128/apps/com.gosh.Transfer.png", "644"],
+    ["../../assets/icons/128x128@2x.png", "usr/share/icons/hicolor/256x256/apps/com.gosh.Transfer.png", "644"],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/gosh-transfer-gtk", dest = "/usr/bin/gosh-transfer-gtk", mode = "755" },
+    { source = "data/com.gosh.Transfer.desktop", dest = "/usr/share/applications/com.gosh.Transfer.desktop", mode = "644" },
+    { source = "data/com.gosh.Transfer.metainfo.xml", dest = "/usr/share/metainfo/com.gosh.Transfer.metainfo.xml", mode = "644" },
+    { source = "assets/icons/32x32.png", dest = "/usr/share/icons/hicolor/32x32/apps/com.gosh.Transfer.png", mode = "644" },
+    { source = "assets/icons/128x128.png", dest = "/usr/share/icons/hicolor/128x128/apps/com.gosh.Transfer.png", mode = "644" },
+    { source = "assets/icons/128x128@2x.png", dest = "/usr/share/icons/hicolor/256x256/apps/com.gosh.Transfer.png", mode = "644" },
+]
+
+[package.metadata.generate-rpm.requires]
+gtk4 = "*"
+libadwaita = "*"
