@@ -81,6 +81,22 @@ mod imp {
             let empty_model = gtk4::StringList::new(&["No favorites saved"]);
             favorites_dropdown.set_model(Some(&empty_model));
             favorites_dropdown.set_sensitive(false);
+
+            // Add manage button to favorites row
+            let manage_button = gtk4::Button::from_icon_name("document-edit-symbolic");
+            manage_button.set_tooltip_text(Some("Manage favorites"));
+            manage_button.set_valign(gtk4::Align::Center);
+            manage_button.add_css_class("flat");
+            favorites_dropdown.add_suffix(&manage_button);
+
+            manage_button.connect_clicked(glib::clone!(
+                #[weak(rename_to = this)]
+                self,
+                move |button| {
+                    this.show_manage_favorites_dialog(button);
+                }
+            ));
+
             favorites_card.add(&favorites_dropdown);
             *self.favorites_dropdown.borrow_mut() = Some(favorites_dropdown.clone());
 
@@ -639,7 +655,119 @@ mod imp {
             }
         }
 
+        fn show_manage_favorites_dialog(&self, button: &gtk4::Button) {
+            let obj = self.obj();
+            let Some(app) = obj.get_app() else {
+                return;
+            };
+
+            let window = button
+                .root()
+                .and_then(|r| r.downcast::<gtk4::Window>().ok());
+
+            let dialog = adw::Window::new();
+            dialog.set_title(Some("Manage Favorites"));
+            dialog.set_default_size(400, 300);
+            dialog.set_modal(true);
+            if let Some(ref w) = window {
+                dialog.set_transient_for(Some(w));
+            }
+
+            let content = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
+
+            // Header bar
+            let header = adw::HeaderBar::new();
+            content.append(&header);
+
+            // Scrolled content
+            let scrolled = gtk4::ScrolledWindow::new();
+            scrolled.set_vexpand(true);
+            scrolled.set_policy(gtk4::PolicyType::Never, gtk4::PolicyType::Automatic);
+
+            let list_box = gtk4::ListBox::new();
+            list_box.set_selection_mode(gtk4::SelectionMode::None);
+            list_box.add_css_class("boxed-list");
+            list_box.set_margin_start(12);
+            list_box.set_margin_end(12);
+            list_box.set_margin_top(12);
+            list_box.set_margin_bottom(12);
+
+            // Get favorites and populate list
+            let favorites = self.favorites_list.borrow().clone();
+
+            if favorites.is_empty() {
+                let empty_label = gtk4::Label::new(Some("No favorites saved"));
+                empty_label.add_css_class("dim-label");
+                empty_label.set_margin_top(24);
+                empty_label.set_margin_bottom(24);
+                list_box.append(&empty_label);
+            } else {
+                for (id, name, address, _) in favorites {
+                    let row = adw::ActionRow::new();
+                    row.set_title(&name);
+                    row.set_subtitle(&address);
+
+                    let delete_button = gtk4::Button::from_icon_name("user-trash-symbolic");
+                    delete_button.set_tooltip_text(Some("Remove favorite"));
+                    delete_button.set_valign(gtk4::Align::Center);
+                    delete_button.add_css_class("flat");
+                    delete_button.add_css_class("error");
+                    row.add_suffix(&delete_button);
+
+                    let dialog_weak = dialog.downgrade();
+                    let obj_weak = obj.downgrade();
+                    let store = app.favorites_store().clone();
+                    let id_clone = id.clone();
+
+                    delete_button.connect_clicked(move |_| {
+                        match store.delete(&id_clone) {
+                            Ok(_) => {
+                                tracing::info!("Deleted favorite: {}", id_clone);
+                                // Reload favorites in main view
+                                if let Some(obj) = obj_weak.upgrade() {
+                                    if let Some(app) = obj.get_app() {
+                                        obj.load_favorites(&app);
+                                    }
+                                }
+                                // Close dialog to refresh
+                                if let Some(dlg) = dialog_weak.upgrade() {
+                                    dlg.close();
+                                }
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to delete favorite: {}", e);
+                            }
+                        }
+                    });
+
+                    list_box.append(&row);
+                }
+            }
+
+            scrolled.set_child(Some(&list_box));
+            content.append(&scrolled);
+
+            dialog.set_content(Some(&content));
+            dialog.present();
+        }
+
         fn send_files(&self) {
+            // Wrap in catch_unwind to prevent app crash from panic in folder send
+            if let Err(e) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                self.send_files_inner();
+            })) {
+                tracing::error!("Panic in send_files: {:?}", e);
+                // Reset UI state after panic
+                if let Some(row) = self.files_row.borrow().as_ref() {
+                    row.set_subtitle("Send failed - please try again");
+                }
+                *self.selected_directory.borrow_mut() = None;
+                self.selected_files.borrow_mut().clear();
+                self.update_send_button_state();
+            }
+        }
+
+        fn send_files_inner(&self) {
             let obj = self.obj();
             if let Some(app) = obj.get_app() {
                 let address = self
@@ -723,6 +851,10 @@ impl SendView {
                         );
                         dropdown.set_model(Some(&model));
                         dropdown.set_sensitive(true);
+                        // Reset selection to trigger the notify signal
+                        // Setting to INVALID_LIST_POSITION first ensures setting to 0 fires the signal
+                        dropdown.set_selected(gtk4::INVALID_LIST_POSITION);
+                        dropdown.set_selected(0);
                     }
                 }
             }
