@@ -54,7 +54,7 @@ impl InterfaceCategory {
 }
 
 /// Filters for which network interface categories to display
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InterfaceFilters {
     /// Show WiFi interfaces (wl*)

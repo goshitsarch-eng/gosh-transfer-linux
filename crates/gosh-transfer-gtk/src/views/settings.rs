@@ -283,8 +283,9 @@ mod imp {
         fn save_settings(&self) {
             let obj = self.obj();
             if let Some(app) = obj.get_app() {
-                // Track original port for change detection
+                // Track original values for change detection
                 let original_port = app.settings().port;
+                let original_filters = app.settings().interface_filters.clone();
 
                 let name = self
                     .name_row
@@ -377,6 +378,7 @@ mod imp {
                         .map(|r| r.is_active())
                         .unwrap_or(true),
                 };
+                let filters_changed = original_filters != interface_filters;
 
                 let new_settings = AppSettings {
                     port,
@@ -417,12 +419,28 @@ mod imp {
                             overlay.add_toast(toast);
                         }
 
-                        // Show restart recommendation if port changed
-                        if port_changed {
+                        // Show restart recommendation if port or interface filters changed
+                        if port_changed || filters_changed {
+                            let (title, body) = match (port_changed, filters_changed) {
+                                (true, true) => (
+                                    "Settings Changed",
+                                    "You changed the server port and network interface filters. It's recommended to close and reopen the app for the changes to take full effect.",
+                                ),
+                                (true, false) => (
+                                    "Port Changed",
+                                    "You changed the server port. It's recommended to close and reopen the app for the change to take full effect.",
+                                ),
+                                (false, true) => (
+                                    "Interface Filters Changed",
+                                    "You changed the network interface visibility settings. It's recommended to close and reopen the app to refresh the interface list.",
+                                ),
+                                (false, false) => unreachable!(),
+                            };
+
                             let dialog = adw::MessageDialog::new(
                                 Some(&window),
-                                Some("Port Changed"),
-                                Some("You changed the server port. It's recommended to close and reopen the app for the change to take full effect."),
+                                Some(title),
+                                Some(body),
                             );
 
                             dialog.add_response("dismiss", "Dismiss");
