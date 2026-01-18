@@ -113,8 +113,13 @@ pub enum EngineCommand {
     StopServer,
     ResolveAddress { address: String, reply: Sender<ResolveResult> },
     SendFiles { address: String, port: u16, paths: Vec<PathBuf> },
+    SendDirectory { address: String, port: u16, path: PathBuf },
     AcceptTransfer { id: String },
     RejectTransfer { id: String },
+    AcceptAllTransfers,
+    RejectAllTransfers,
+    CancelTransfer { id: String },
+    CheckPeer { address: String, port: u16, reply: Sender<bool> },
     GetPendingTransfers { reply: Sender<Vec<PendingTransfer>> },
     GetInterfaces { reply: Sender<Vec<NetworkInterface>> },
     UpdateConfig { config: EngineConfig },
@@ -156,12 +161,14 @@ The window subscribes to engine events in `setup_engine_events()`:
 
 | Event | Handler |
 |-------|---------|
-| `TransferRequest` | Add to pending, show badge |
-| `TransferProgress` | Update progress bar, move to active |
-| `TransferComplete` | Mark complete, remove after 3s |
-| `TransferFailed` | Show error, remove after 5s |
+| `TransferRequest` | Add to pending, show badge, increment counter |
+| `TransferProgress` | Update progress bar, move to active, decrement badge on first progress |
+| `TransferComplete` | Mark complete, refresh history, remove after 3s |
+| `TransferFailed` | Show error, decrement badge if still pending, remove after 5s |
+| `TransferRetry` | Display retry attempt in status label |
 | `ServerStarted` | Log port |
 | `ServerStopped` | Log |
+| `PortChanged` | Log old and new port |
 
 ## Configuration
 
@@ -182,9 +189,9 @@ Files:
 | App ID | `com.gosh.Transfer` | `main.rs:12` |
 | Default port | 53317 | `types.rs:151` |
 | Window size | 1024×768 | `window/imp.rs:19-20` |
-| Tokio workers | 2 | `engine_bridge.rs:62` |
-| Command channel | 32 | `engine_bridge.rs:56` |
-| Event channel | 64 | `engine_bridge.rs:57` |
+| Tokio workers | 2 | `engine_bridge.rs:76` |
+| Command channel | 32 | `engine_bridge.rs:70` |
+| Event channel | 64 | `engine_bridge.rs:71` |
 | History max | 100 | `history.rs:13` |
 
 ## External Dependencies
@@ -209,11 +216,12 @@ The `gosh-lan-transfer` engine supports more features than currently exposed in 
 | Accept/reject transfers | ✓ | ✓ |
 | Batch accept/reject | ✓ | ✓ |
 | Cancel mid-transfer | ✓ | ✓ |
-| Runtime port change | ✓ | ✗ |
+| Runtime port change | ✓ | ✗ (requires restart) |
 | Automatic retry with backoff | ✓ | ✓ (via engine) |
 | Progress tracking | ✓ | ✓ |
 | TransferRetry event | ✓ | ✓ |
-| Peer health checks | ✓ | ✗ |
+| Peer health checks | ✓ | ✓ (test connection button) |
+| Address resolution | ✓ | ✓ (with debounced live feedback) |
 | Interface category filtering | N/A | ✓ |
 
-Runtime port change and peer health checks represent potential future enhancements.
+Runtime port change currently recommends an app restart. The engine supports dynamic port changes, but the GTK frontend does not expose this fully.

@@ -127,11 +127,15 @@ pub struct InterfaceFilters {
 
 ```rust
 pub struct Favorite {
-    pub id: String,      // UUID
-    pub name: String,    // Display name
-    pub address: String, // IP or hostname
+    pub id: String,                   // UUID
+    pub name: String,                 // Display name
+    pub address: String,              // IP or hostname
+    pub last_resolved_ip: Option<String>, // Cached resolved IP
+    pub last_used: Option<DateTime<Utc>>, // Last usage timestamp
 }
 ```
+
+Note: `Favorite` is defined in the `gosh-lan-transfer` crate. The `last_resolved_ip` field is updated by the GTK frontend when hostname resolution succeeds.
 
 ### TransferRecord
 

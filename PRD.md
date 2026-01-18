@@ -104,8 +104,9 @@
 
 ### FR5: Transfer History
 - [x] Record all completed/failed transfers — via engine
-- [ ] Display history with direction, peer, files, status — UI placeholder only
+- [x] Display history with direction, peer, files, status, relative time
 - [x] Persist history across sessions (max 100 entries)
+- [x] Clear history button
 
 ## Non-Functional Requirements
 
@@ -153,14 +154,15 @@
 
 Features supported by the engine but not yet exposed in the UI:
 
-1. **Runtime port change**: Modify server port without restart
-2. **Peer health checks**: Verify connectivity before sending
+1. **Runtime port change**: The engine supports dynamic port changes, but the GTK frontend recommends an app restart after port changes
 
 Previously planned features now implemented:
 - Directory sending (v2.0.3+)
 - Batch accept/reject (v2.0.3+)
 - Transfer cancellation (v2.0.3+)
 - Interface category filtering (unreleased)
+- Peer health checks via test connection button (unreleased)
+- Address resolution with live feedback (unreleased)
 
 ## Timeline
 

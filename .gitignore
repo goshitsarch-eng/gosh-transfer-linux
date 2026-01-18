@@ -22,7 +22,7 @@ Thumbs.db
 .env.*.local
 
 # Session data
-.claude/
+.session/
 
 # Flatpak build
 .flatpak-builder/
@@ -41,3 +41,4 @@ debian/gosh-transfer/
 # RPM packaging
 *.rpm
 rpmbuild/
+AUDIT_REPORT.md

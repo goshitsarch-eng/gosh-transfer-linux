@@ -1,8 +1,6 @@
 # Gosh Transfer
 
-A GTK4/Libadwaita desktop application for explicit file transfers over LAN, Tailscale, and VPNs.
-
-Powered by [gosh-lan-transfer](https://github.com/goshitsarch-eng/gosh-lan-transfer).
+A GTK4/Libadwaita desktop application for explicit file transfers over LAN, Tailscale, and VPNs. Powered by [gosh-lan-transfer](https://github.com/goshitsarch-eng/gosh-lan-transfer).
 
 ## Philosophy
 
@@ -10,7 +8,11 @@ Gosh apps are built with a Linux-first mindset: simplicity, transparency, and us
 
 ## What It Does
 
-Gosh Transfer sends files between computers using explicit IP addresses or hostnames. No auto-discovery, no cloud services, no magic—you specify where files go.
+Gosh Transfer sends files between computers using explicit IP addresses or hostnames. No auto-discovery, no cloud services, no magic. You specify exactly where files go.
+
+Send files or entire directories to any machine on your network by entering its address and picking what to transfer. On the receiving end, incoming requests appear for you to accept or reject individually, or handle all at once with batch operations. Transfers show real-time progress with speed indicators, and you can cancel them mid-flight if needed.
+
+Save frequently-used peers as favorites for quick access, or add trusted hosts that auto-accept transfers without prompting. The interface filtering lets you choose which network types to display (WiFi, Ethernet, VPN, Docker), and receive-only mode disables sending entirely when you just want to accept files. All transfers are logged in a persistent history (up to 100 entries), and failed transfers retry automatically.
 
 ## Screenshots
 
@@ -22,85 +24,29 @@ Gosh Transfer sends files between computers using explicit IP addresses or hostn
 ![Screenshot 4](screenshots/img4.png)
 ![Screenshot 5](screenshots/img5.png)
 
-
-## Features
-
-- **Send files and directories** to a specific IP/hostname with file picker
-- **Receive files** with manual accept/reject for each transfer request
-- **Batch operations** to accept or reject all pending transfers at once
-- **Cancel transfers** mid-progress
-- **Real-time progress** with transfer speed display
-- **Favorites** for saving frequently-used peer addresses
-- **Trusted hosts** for auto-accepting transfers from specific IPs
-- **Interface filtering** to show/hide network interface types (WiFi, Ethernet, VPN, Docker)
-- **Receive-only mode** to disable sending
-- **Theme support** (dark/light/system)
-- **Transfer history** with persistent storage (up to 100 entries)
-- **Automatic retry** on network interruptions
-
 ## Technical Details
 
-### Architecture
-
-| Component | Technology |
-|-----------|------------|
-| Frontend | GTK4 0.9 + Libadwaita 0.7 |
-| Transfer Engine | [gosh-lan-transfer](https://github.com/goshitsarch-eng/gosh-lan-transfer) |
-| Async Runtime | Tokio |
-| Language | Rust 2021 edition |
+The frontend uses GTK4 0.9 with Libadwaita 0.7, written in Rust 2021 edition. The transfer engine comes from the [gosh-lan-transfer](https://github.com/goshitsarch-eng/gosh-lan-transfer) crate, which runs on Tokio for async operations.
 
 ### Network Protocol
 
-The application runs an HTTP server on port **53317** (default).
+The application runs an HTTP server on port 53317 by default. The protocol exposes four endpoints: `/health` for status checks, `/transfer` (POST) to initiate requests with metadata, `/transfer/status` (GET) to poll approval status, and `/chunk` (POST) to stream file data.
 
-The transfer protocol is implemented in the [gosh-lan-transfer](https://github.com/goshitsarch-eng/gosh-lan-transfer) crate, which provides:
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/health` | GET | Server status verification |
-| `/transfer` | POST | Initiate transfer request with metadata |
-| `/transfer/status` | GET | Poll approval status |
-| `/chunk` | POST | Stream file data |
-
-**Security model**: UUID tokens authorize uploads per transfer, filenames undergo path traversal sanitization. The system assumes trusted networks (LAN/VPN/Tailscale).
+Security relies on UUID tokens authorizing uploads per transfer, with filename sanitization preventing path traversal attacks. The system assumes you're on a trusted network like a LAN, VPN, or Tailscale.
 
 ### Data Storage
 
-Settings, favorites, and history are stored in `~/.config/gosh/transfer/`:
-
-| File | Purpose |
-|------|---------|
-| `settings.json` | Application settings |
-| `favorites.json` | Saved peer addresses |
-| `history.json` | Transfer history (max 100 entries) |
+Configuration lives in `~/.config/gosh/transfer/` on Linux (determined by the `directories` crate). Three JSON files handle persistence: `settings.json` for application settings, `favorites.json` for saved peer addresses, and `history.json` for transfer records (capped at 100 entries).
 
 ### Settings
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `port` | u16 | 53317 | Server port |
-| `deviceName` | string | hostname | Shown to peers |
-| `downloadDir` | path | OS Downloads folder | Where received files are saved |
-| `trustedHosts` | string[] | [] | IPs for auto-accept |
-| `receiveOnly` | bool | false | Hides Send functionality |
-| `notificationsEnabled` | bool | true | System notifications toggle |
-| `theme` | string | "system" | "dark", "light", or "system" |
-| `maxRetries` | u32 | 3 | Retry attempts for failed transfers |
-| `retryDelayMs` | u64 | 1000 | Delay between retry attempts |
-| `interfaceFilters` | object | see below | Interface category visibility |
+The server runs on port 53317 by default and identifies itself to peers using your system hostname. Downloaded files land in your OS Downloads folder unless you change it. You can configure trusted hosts for auto-accept, toggle receive-only mode, enable or disable notifications, and pick your theme (system, light, or dark).
 
-**Interface Filters** (all boolean, defaults in parentheses):
-- `showWifi` (true), `showEthernet` (true), `showVpn` (true), `showDocker` (false), `showOther` (true)
+Transfer reliability settings include max retries (default 3) and retry delay (default 1000ms). Interface filters control which network types appear in the address list, with WiFi, Ethernet, VPN, and Other shown by default while Docker interfaces are hidden.
 
 ## Building
 
-### Prerequisites
-
-- Rust 1.70+
-- GTK4 development libraries
-- Libadwaita development libraries
-
-### System Dependencies
+You'll need Rust 1.70 or newer along with GTK4 and Libadwaita development libraries.
 
 **Ubuntu/Debian:**
 ```bash
@@ -112,19 +58,7 @@ sudo apt-get install libgtk-4-dev libadwaita-1-dev libssl-dev pkg-config
 sudo dnf install gtk4-devel libadwaita-devel openssl-devel
 ```
 
-### Development
-
-```bash
-cargo run -p gosh-transfer-gtk
-```
-
-### Production Build
-
-```bash
-cargo build --release -p gosh-transfer-gtk
-```
-
-The binary will be at `target/release/gosh-transfer-gtk`.
+For development, run `cargo run -p gosh-transfer-gtk`. Production builds use `cargo build --release -p gosh-transfer-gtk`, producing a binary at `target/release/gosh-transfer-gtk`.
 
 ## Disclaimer
 
@@ -134,4 +68,4 @@ This software is licensed under the GNU Affero General Public License v3.0 (AGPL
 
 ## License
 
-AGPL-3.0 - See [LICENSE](LICENSE)
+AGPL-3.0. See [LICENSE](LICENSE).
