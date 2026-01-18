@@ -10,13 +10,14 @@ use libadwaita::prelude::*;
 
 mod imp {
     use super::*;
-    use std::cell::RefCell;
+    use std::cell::{Cell, RefCell};
 
     #[derive(Default)]
     pub struct SendView {
         pub dest_row: RefCell<Option<adw::EntryRow>>,
         pub resolution_label: RefCell<Option<gtk4::Label>>,
         pub resolve_timeout: RefCell<Option<glib::SourceId>>,
+        pub resolve_generation: Cell<u64>,
         pub test_button: RefCell<Option<gtk4::Button>>,
         pub test_spinner: RefCell<Option<gtk4::Spinner>>,
         pub favorites_dropdown: RefCell<Option<adw::ComboRow>>,
@@ -298,6 +299,10 @@ mod imp {
                 source_id.remove();
             }
 
+            // Increment generation - invalidates all in-flight callbacks
+            let generation = self.resolve_generation.get().wrapping_add(1);
+            self.resolve_generation.set(generation);
+
             let address = self
                 .dest_row
                 .borrow()
@@ -313,7 +318,7 @@ mod imp {
                 return;
             }
 
-            // Show "Resolving..." immediately
+            // Show "Resolving..." immediately and clear previous state
             if let Some(label) = self.resolution_label.borrow().as_ref() {
                 label.set_text("Resolving...");
                 label.remove_css_class("success");
@@ -329,14 +334,14 @@ mod imp {
                     self,
                     move || {
                         this.resolve_timeout.borrow_mut().take();
-                        this.resolve_address();
+                        this.resolve_address(generation);
                     }
                 ),
             );
             *self.resolve_timeout.borrow_mut() = Some(source_id);
         }
 
-        fn resolve_address(&self) {
+        fn resolve_address(&self, expected_generation: u64) {
             let obj = self.obj();
             if let Some(app) = obj.get_app() {
                 let address = self
@@ -350,12 +355,24 @@ mod imp {
                     return;
                 }
 
-                let resolution_label = self.resolution_label.borrow().clone();
+                let this_weak = obj.downgrade();
                 let favorites_store = app.favorites_store().clone();
                 let address_for_update = address.clone();
 
                 app.engine_bridge().resolve_address(address, move |result| {
-                    if let Some(label) = resolution_label.as_ref() {
+                    let Some(this_obj) = this_weak.upgrade() else {
+                        return;
+                    };
+                    let this = this_obj.imp();
+
+                    // Check if result is still relevant (generation matches)
+                    if this.resolve_generation.get() != expected_generation {
+                        tracing::debug!("Ignoring stale resolution result");
+                        return;
+                    }
+
+                    let label = this.resolution_label.borrow().clone();
+                    if let Some(label) = label.as_ref() {
                         if result.success && !result.ips.is_empty() {
                             let ip = &result.ips[0];
                             label.set_text(&format!("Resolved to {}", ip));
