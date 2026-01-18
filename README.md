@@ -22,7 +22,6 @@ Save frequently-used peers as favorites for quick access, or add trusted hosts t
 ![Screenshot 2](screenshots/img2.png)
 ![Screenshot 3](screenshots/img3.png)
 ![Screenshot 4](screenshots/img4.png)
-![Screenshot 5](screenshots/img5.png)
 
 ## Technical Details
 
