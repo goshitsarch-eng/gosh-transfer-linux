@@ -65,8 +65,8 @@ jobs:
               with open("Cargo.toml", "rb") as f:
                   data = tomllib.load(f)
               print(data["workspace"]["package"]["version"])
-PY
-)
+              PY
+            )
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
