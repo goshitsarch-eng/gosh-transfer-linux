@@ -61,10 +61,10 @@ jobs:
             VERSION="${GITHUB_REF#refs/tags/v}"
           else
             VERSION=$(python - <<'PY'
-import tomllib
-with open("Cargo.toml", "rb") as f:
-    data = tomllib.load(f)
-print(data["workspace"]["package"]["version"])
+              import tomllib
+              with open("Cargo.toml", "rb") as f:
+                  data = tomllib.load(f)
+              print(data["workspace"]["package"]["version"])
 PY
 )
           fi
