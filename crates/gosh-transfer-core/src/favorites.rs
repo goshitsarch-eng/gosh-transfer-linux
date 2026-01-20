@@ -90,6 +90,20 @@ impl FileFavoritesStore {
         self.persist()?;
         Ok(())
     }
+
+    /// Update last_used timestamp for a favorite
+    pub fn touch(&self, id: &str) -> Result<(), AppError> {
+        {
+            let mut favorites = self.favorites.write().unwrap();
+            let favorite = favorites
+                .iter_mut()
+                .find(|f| f.id == id)
+                .ok_or_else(|| AppError::InvalidConfig(format!("Favorite not found: {}", id)))?;
+            favorite.last_used = Some(chrono::Utc::now());
+        }
+        self.persist()?;
+        Ok(())
+    }
 }
 
 // Implement the engine's FavoritesPersistence trait

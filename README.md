@@ -1,6 +1,6 @@
 # Gosh Transfer
 
-A GTK4/Libadwaita desktop application for explicit file transfers over LAN, Tailscale, and VPNs. Powered by [gosh-lan-transfer](https://github.com/goshitsarch-eng/gosh-lan-transfer).
+A desktop application for explicit file transfers over LAN, Tailscale, and VPNs. Powered by [gosh-lan-transfer](https://github.com/goshitsarch-eng/gosh-lan-transfer).
 
 ## Philosophy
 
@@ -23,7 +23,7 @@ Save frequently-used peers as favorites for quick access, or add trusted hosts t
 
 ## Technical Details
 
-The frontend uses GTK4 0.9 with Libadwaita 0.7, written in Rust 2021 edition. The transfer engine comes from the [gosh-lan-transfer](https://github.com/goshitsarch-eng/gosh-lan-transfer) crate, which runs on Tokio for async operations.
+The frontend is built with Qt6 Widgets. The transfer engine comes from the [gosh-lan-transfer](https://github.com/goshitsarch-eng/gosh-lan-transfer) crate, which runs on Tokio for async operations.
 
 ### Network Protocol
 
@@ -43,19 +43,21 @@ Transfer reliability settings include max retries (default 3) and retry delay (d
 
 ## Building
 
-You'll need Rust 1.70 or newer along with GTK4 and Libadwaita development libraries.
+You'll need Rust 1.70 or newer along with Qt6 development libraries.
 
 **Ubuntu/Debian:**
 ```bash
-sudo apt-get install libgtk-4-dev libadwaita-1-dev libssl-dev pkg-config
+sudo apt-get install qt6-base-dev libssl-dev pkg-config
 ```
 
 **Fedora:**
 ```bash
-sudo dnf install gtk4-devel libadwaita-devel openssl-devel
+sudo dnf install qt6-qtbase-devel openssl-devel
 ```
 
-For development, run `cargo run -p gosh-transfer-gtk`. Production builds use `cargo build --release -p gosh-transfer-gtk`, producing a binary at `target/release/gosh-transfer-gtk`.
+For development, run `cargo run -p gosh-transfer-qt`.
+
+Production builds use `cargo build --release -p gosh-transfer-qt` (binary: `target/release/gosh-transfer-linux-qt`).
 
 ## Disclaimer
 

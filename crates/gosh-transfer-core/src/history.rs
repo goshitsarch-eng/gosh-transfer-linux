@@ -4,7 +4,7 @@
 // Stores completed transfer records in a local JSON file.
 
 use crate::types::AppError;
-use gosh_lan_transfer::TransferRecord;
+use gosh_lan_transfer::{EngineResult, HistoryPersistence, TransferRecord};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::RwLock;
@@ -115,6 +115,62 @@ impl TransferHistory {
     /// Get the count of history entries
     pub fn count(&self) -> usize {
         self.records.read().unwrap().len()
+    }
+}
+
+// Implement engine HistoryPersistence trait for automatic recording.
+impl HistoryPersistence for TransferHistory {
+    fn list(&self) -> EngineResult<Vec<TransferRecord>> {
+        Ok(self.records.read().unwrap().clone())
+    }
+
+    fn list_paginated(&self, offset: usize, limit: usize) -> EngineResult<Vec<TransferRecord>> {
+        let records = self.records.read().unwrap();
+        let end = usize::min(records.len(), offset.saturating_add(limit));
+        if offset >= records.len() {
+            return Ok(Vec::new());
+        }
+        Ok(records[offset..end].to_vec())
+    }
+
+    fn get(&self, transfer_id: &str) -> EngineResult<Option<TransferRecord>> {
+        Ok(self
+            .records
+            .read()
+            .unwrap()
+            .iter()
+            .find(|r| r.id == transfer_id)
+            .cloned())
+    }
+
+    fn add(&self, record: TransferRecord) -> EngineResult<()> {
+        TransferHistory::add(self, record)
+            .map_err(|e| gosh_lan_transfer::EngineError::FileIo(e.to_string()))
+    }
+
+    fn delete(&self, transfer_id: &str) -> EngineResult<()> {
+        {
+            let mut records = self.records.write().unwrap();
+            let original_len = records.len();
+            records.retain(|r| r.id != transfer_id);
+            if records.len() == original_len {
+                return Err(gosh_lan_transfer::EngineError::InvalidConfig(format!(
+                    "Transfer not found: {}",
+                    transfer_id
+                )));
+            }
+        }
+        self.persist()
+            .map_err(|e| gosh_lan_transfer::EngineError::FileIo(e.to_string()))
+    }
+
+    fn clear(&self) -> EngineResult<()> {
+        TransferHistory::clear(self)
+            .map_err(|e| gosh_lan_transfer::EngineError::FileIo(e.to_string()))
+    }
+
+    fn count(&self) -> EngineResult<usize> {
+        Ok(TransferHistory::count(self))
     }
 }
 

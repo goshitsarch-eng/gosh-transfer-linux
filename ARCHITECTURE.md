@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the internal architecture of Gosh Transfer Linux, a GTK4/Libadwaita frontend for the gosh-lan-transfer engine.
+This document describes the internal architecture of Gosh Transfer Linux, which uses a Qt6 Widgets frontend for the gosh-lan-transfer engine.
 
 ## Overview
 
@@ -8,9 +8,9 @@ The application is a Rust workspace with two crates that provide a native Linux 
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    GTK4 Main Loop                        │
+│                   Qt6 Main Thread                        │
 │  ┌─────────────────────────────────────────────────────┐ │
-│  │              gosh-transfer-gtk                      │ │
+│  │              gosh-transfer-qt                       │ │
 │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐            │ │
 │  │  │ SendView │ │ReceiveView│ │SettingsView│ ...      │ │
 │  │  └────┬─────┘ └────┬─────┘ └────┬─────┘            │ │
@@ -69,9 +69,9 @@ Key types:
 - `FileFavoritesStore` - Implements `gosh_lan_transfer::FavoritesPersistence` trait
 - `TransferHistory` - FIFO queue with disk persistence
 
-### `gosh-transfer-gtk`
+### `gosh-transfer-qt`
 
-GTK4/Libadwaita frontend. Location: `crates/gosh-transfer-gtk/`
+Qt6 Widgets frontend. Location: `crates/gosh-transfer-qt/`
 
 ```
 src/
@@ -96,14 +96,14 @@ src/
 
 ## EngineBridge: The Critical Component
 
-The `EngineBridge` (`services/engine_bridge.rs`) solves the fundamental mismatch between GTK's synchronous main loop and the async `GoshTransferEngine`.
+The `EngineBridge` (`services/engine_bridge.rs`) solves the fundamental mismatch between the Qt UI thread and the async `GoshTransferEngine`.
 
 ### How it works
 
 1. **Initialization**: Creates a Tokio runtime with 2 worker threads
 2. **Command channel**: UI sends `EngineCommand` variants via `async_channel::Sender`
 3. **Event channel**: Engine events forwarded to UI via `async_channel::Receiver`
-4. **GTK integration**: Uses `glib::spawn_future_local()` to bridge async operations
+4. **Qt integration**: Uses a background thread and Qt signal dispatch to bridge async operations
 
 ### Command Types
 
@@ -131,7 +131,7 @@ pub enum EngineCommand {
 **UI → Engine:**
 ```
 User action → View method → EngineBridge.send_files()
-    → glib::spawn_future_local → async_channel::send
+    → Qt signal dispatch → async_channel::send
     → Tokio runtime → GoshTransferEngine.send_files()
 ```
 
@@ -139,7 +139,7 @@ User action → View method → EngineBridge.send_files()
 ```
 GoshTransferEngine event → mpsc::Receiver
     → EngineBridge task → async_channel::send
-    → Window event handler (glib::spawn_future_local)
+    → Window event handler (Qt signal/slot)
     → View update
 ```
 
@@ -205,11 +205,11 @@ The transfer protocol implementation lives entirely in [gosh-lan-transfer](https
 
 This application does not implement any HTTP server/client logic itself.
 
-## Engine Capabilities vs GTK Implementation
+## Engine Capabilities vs Qt Implementation
 
-The `gosh-lan-transfer` engine supports more features than currently exposed in the GTK frontend:
+The `gosh-lan-transfer` engine supports more features than currently exposed in the Qt frontend:
 
-| Capability | Engine | GTK Frontend |
+| Capability | Engine | Qt Frontend |
 |------------|--------|--------------|
 | Send files | ✓ | ✓ |
 | Send directories (preserving structure) | ✓ | ✓ |
@@ -224,4 +224,4 @@ The `gosh-lan-transfer` engine supports more features than currently exposed in 
 | Address resolution | ✓ | ✓ (with debounced live feedback) |
 | Interface category filtering | N/A | ✓ |
 
-Runtime port change currently recommends an app restart. The engine supports dynamic port changes, but the GTK frontend does not expose this fully.
+Runtime port change is exposed in the Qt frontend.

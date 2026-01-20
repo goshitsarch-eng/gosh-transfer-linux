@@ -24,7 +24,7 @@
       <li>Works seamlessly over LAN, Tailscale, and VPN connections</li>
       <li>Transfer history with detailed logs</li>
       <li>Favorite addresses for quick access</li>
-      <li>Native GTK4/Libadwaita interface</li>
+      <li>Native Qt6 Widgets interface</li>
     </ul>
   </description>
 
@@ -66,6 +66,11 @@
   </recommends>
 
   <releases>
+    <release version="2.20.0" date="2026-01-20">
+      <description>
+        <p>Qt6 Widgets migration and packaging updates.</p>
+      </description>
+    </release>
     <release version="2.1.1" date="2026-01-17">
       <description>
         <p>Fixed crash when sending folders.</p>

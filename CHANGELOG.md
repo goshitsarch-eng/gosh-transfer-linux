@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.0] - 2026-01-20
+
+### Added
+- Qt6 Widgets frontend (`gosh-transfer-qt`) (Qt migration)
+- Qt-based packaging updates (deb/rpm/appimage/flatpak)
+- Bandwidth limit setting field (engine config)
+
+### Changed
+- Desktop entry now targets Qt binary (`gosh-transfer-linux-qt`)
+- Flatpak runtime switched to KDE for Qt6
+
+### Removed
+- GTK frontend and GTK-specific packaging
+
+### Fixed
+- Implemented history persistence via engine `HistoryPersistence` integration
+
 ## [2.1.2] - 2026-01-17
 
 ### Fixed

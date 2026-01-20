@@ -2,15 +2,15 @@
 
 ## System Architecture
 
-Gosh Transfer Linux is a native GTK4/Libadwaita desktop application that provides a graphical interface for the `gosh-lan-transfer` file transfer engine.
+Gosh Transfer Linux is a native desktop application that provides a graphical interface for the `gosh-lan-transfer` file transfer engine. It ships a Qt6 Widgets frontend.
 
 ### High-Level Architecture
 
 ```
 ┌────────────────────────────────────────────────────┐
-│                  GTK4 Main Loop                     │
+│                 Qt6 Main Thread                     │
 │  ┌──────────────────────────────────────────────┐  │
-│  │           gosh-transfer-gtk                  │  │
+│  │           gosh-transfer-qt                   │  │
 │  │  ┌────────┐ ┌────────┐ ┌────────┐           │  │
 │  │  │  Views │ │ Window │ │  App   │           │  │
 │  │  └───┬────┘ └───┬────┘ └───┬────┘           │  │
@@ -45,8 +45,7 @@ Gosh Transfer Linux is a native GTK4/Libadwaita desktop application that provide
 
 | Layer | Technology | Version |
 |-------|------------|---------|
-| UI Framework | GTK4 | 0.9 |
-| UI Toolkit | Libadwaita | 0.7 |
+| UI Framework | Qt6 Widgets | 6.x |
 | Language | Rust | 2021 edition |
 | Async Runtime | Tokio | Multi-threaded |
 | Transfer Engine | gosh-lan-transfer | Git dependency |
@@ -68,14 +67,11 @@ gosh-transfer-linux/
 │   │       ├── settings.rs
 │   │       ├── favorites.rs
 │   │       └── history.rs
-│   └── gosh-transfer-gtk/  # GTK4 frontend
+│   └── gosh-transfer-qt/   # Qt6 Widgets frontend
 │       └── src/
 │           ├── main.rs
-│           ├── application.rs
-│           ├── window/
-│           ├── views/
-│           ├── services/
-│           └── widgets/
+│           ├── engine_bridge.rs
+│           └── qt/
 └── .github/workflows/      # CI/CD
 ```
 
@@ -88,10 +84,9 @@ gosh-transfer-linux/
 - `uuid` - Transfer ID generation
 - `chrono` - Timestamps
 
-**gosh-transfer-gtk:**
-- `gtk4` - GTK4 bindings
-- `libadwaita` - Adwaita widgets
-- `glib`, `gio` - GLib/GIO bindings
+**gosh-transfer-qt:**
+- `cxx-qt` - Qt bridge
+- `cxx-qt-lib` - Qt bindings
 - `async-channel` - Async/sync bridge
 - `tokio` - Async runtime
 - `tracing` - Logging
@@ -135,7 +130,7 @@ pub struct Favorite {
 }
 ```
 
-Note: `Favorite` is defined in the `gosh-lan-transfer` crate. The `last_resolved_ip` field is updated by the GTK frontend when hostname resolution succeeds.
+Note: `Favorite` is defined in the `gosh-lan-transfer` crate. The `last_resolved_ip` field is updated by the Qt frontend when hostname resolution succeeds.
 
 ### TransferRecord
 
@@ -193,7 +188,7 @@ Implemented by `gosh-lan-transfer` crate. This application does not implement pr
 
 ## EngineBridge Pattern
 
-The `EngineBridge` solves the async/sync impedance mismatch between GTK's main loop and the async transfer engine.
+The `EngineBridge` solves the async/sync impedance mismatch between the Qt UI thread and the async transfer engine.
 
 ### Command Flow (UI → Engine)
 
@@ -201,7 +196,7 @@ The `EngineBridge` solves the async/sync impedance mismatch between GTK's main l
 User action
   → View method call
   → EngineBridge.method()
-  → glib::spawn_future_local()
+  → Qt signal dispatch (queued)
   → async_channel::send(EngineCommand)
   → Tokio runtime receives
   → GoshTransferEngine.method()
@@ -213,7 +208,7 @@ User action
 GoshTransferEngine event
   → mpsc::Receiver in bridge task
   → async_channel::send(EngineEvent)
-  → Window event handler (glib::spawn_future_local)
+  → Window event handler (Qt signal/slot)
   → View update methods
 ```
 
@@ -239,9 +234,9 @@ GoshTransferEngine event
 
 | Target | Workflow | Output |
 |--------|----------|--------|
-| Linux x86_64 | `build-linux.yml` | `gosh-transfer-gtk` binary |
-| Linux ARM64 | `build-linux-arm.yml` | `gosh-transfer-gtk` binary |
-| Flatpak | `build-flatpak.yml` | `.flatpak` bundle |
+| Linux x86_64 | `release.yml` | `gosh-transfer-linux-qt` binary |
+| Linux ARM64 | `release.yml` | `gosh-transfer-linux-qt` binary |
+| Flatpak | `release.yml` | `.flatpak` bundle |
 
 ### System Dependencies
 
@@ -253,6 +248,16 @@ libgtk-4-dev libadwaita-1-dev libssl-dev pkg-config
 **Fedora:**
 ```bash
 gtk4-devel libadwaita-devel openssl-devel
+```
+
+**Qt6 (Ubuntu/Debian):**
+```bash
+qt6-base-dev libssl-dev pkg-config
+```
+
+**Qt6 (Fedora):**
+```bash
+qt6-qtbase-devel openssl-devel
 ```
 
 ## Security Considerations

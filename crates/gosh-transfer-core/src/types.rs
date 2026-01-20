@@ -124,6 +124,9 @@ pub struct AppSettings {
     /// Delay between retry attempts in milliseconds
     #[serde(default = "default_retry_delay_ms")]
     pub retry_delay_ms: u64,
+    /// Optional bandwidth limit (bytes per second). None means unlimited.
+    #[serde(default)]
+    pub bandwidth_limit_bps: Option<u64>,
     /// Interface category visibility filters
     #[serde(default)]
     pub interface_filters: InterfaceFilters,
@@ -159,6 +162,7 @@ impl Default for AppSettings {
             theme: default_theme(),
             max_retries: default_max_retries(),
             retry_delay_ms: default_retry_delay_ms(),
+            bandwidth_limit_bps: None,
             interface_filters: InterfaceFilters::default(),
         }
     }
@@ -175,6 +179,7 @@ impl AppSettings {
             .receive_only(self.receive_only)
             .max_retries(self.max_retries)
             .retry_delay_ms(self.retry_delay_ms)
+            .bandwidth_limit_bps(self.bandwidth_limit_bps)
             .build()
     }
 }

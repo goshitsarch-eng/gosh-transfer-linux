@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0
-// Gosh Transfer GTK - Engine Bridge
+// Gosh Transfer Qt - Engine Bridge
 //
-// Bridges the async GoshTransferEngine with GTK's main loop.
+// Bridges the async GoshTransferEngine with the Qt main thread.
 
 use async_channel::{Receiver, Sender};
 use gosh_lan_transfer::{
     EngineConfig, EngineEvent, GoshTransferEngine, NetworkInterface, PendingTransfer, ResolveResult,
 };
+use gosh_transfer_core::TransferHistory;
+use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -47,6 +49,11 @@ pub enum EngineCommand {
         port: u16,
         reply: Sender<bool>,
     },
+    GetPeerInfo {
+        address: String,
+        port: u16,
+        reply: Sender<Result<Value, String>>,
+    },
     GetPendingTransfers {
         reply: Sender<Vec<PendingTransfer>>,
     },
@@ -56,9 +63,13 @@ pub enum EngineCommand {
     UpdateConfig {
         config: EngineConfig,
     },
+    ChangePort {
+        port: u16,
+        rollback_on_failure: bool,
+    },
 }
 
-/// Bridge between GTK UI and async engine
+/// Bridge between Qt UI and async engine
 pub struct EngineBridge {
     command_tx: Sender<EngineCommand>,
     event_rx: Receiver<EngineEvent>,
@@ -66,11 +77,10 @@ pub struct EngineBridge {
 }
 
 impl EngineBridge {
-    pub fn new(config: EngineConfig) -> Self {
+    pub fn new(config: EngineConfig, history: Option<Arc<TransferHistory>>) -> Self {
         let (command_tx, command_rx) = async_channel::bounded::<EngineCommand>(32);
         let (event_tx, event_rx) = async_channel::bounded::<EngineEvent>(64);
 
-        // Create tokio runtime
         let runtime = Arc::new(
             tokio::runtime::Builder::new_multi_thread()
                 .worker_threads(2)
@@ -79,10 +89,9 @@ impl EngineBridge {
                 .expect("Failed to create Tokio runtime"),
         );
 
-        // Spawn the engine management task
         let rt = runtime.clone();
         runtime.spawn(async move {
-            Self::run_engine(config, command_rx, event_tx).await;
+            Self::run_engine(config, command_rx, event_tx, history).await;
         });
 
         Self {
@@ -96,13 +105,17 @@ impl EngineBridge {
         config: EngineConfig,
         command_rx: Receiver<EngineCommand>,
         event_tx: Sender<EngineEvent>,
+        history: Option<Arc<TransferHistory>>,
     ) {
-        let (engine, mut engine_events) = GoshTransferEngine::with_channel_events(config);
+        let (engine, mut engine_events) = if let Some(history) = history {
+            GoshTransferEngine::with_channel_events_and_history(config, history)
+        } else {
+            GoshTransferEngine::with_channel_events(config)
+        };
         let engine = Arc::new(Mutex::new(engine));
 
         loop {
             tokio::select! {
-                // Handle commands from UI
                 cmd = command_rx.recv() => {
                     match cmd {
                         Ok(EngineCommand::StartServer) => {
@@ -125,6 +138,12 @@ impl EngineBridge {
                                 tracing::error!("Send failed: {}", e);
                             }
                         }
+                        Ok(EngineCommand::SendDirectory { address, port, path }) => {
+                            let eng = engine.lock().await;
+                            if let Err(e) = eng.send_directory(&address, port, path).await {
+                                tracing::error!("Send directory failed: {}", e);
+                            }
+                        }
                         Ok(EngineCommand::AcceptTransfer { id }) => {
                             let eng = engine.lock().await;
                             if let Err(e) = eng.accept_transfer(&id).await {
@@ -135,12 +154,6 @@ impl EngineBridge {
                             let eng = engine.lock().await;
                             if let Err(e) = eng.reject_transfer(&id).await {
                                 tracing::error!("Reject failed: {}", e);
-                            }
-                        }
-                        Ok(EngineCommand::SendDirectory { address, port, path }) => {
-                            let eng = engine.lock().await;
-                            if let Err(e) = eng.send_directory(&address, port, path).await {
-                                tracing::error!("Send directory failed: {}", e);
                             }
                         }
                         Ok(EngineCommand::AcceptAllTransfers) => {
@@ -172,6 +185,11 @@ impl EngineBridge {
                             let reachable = eng.check_peer(&address, port).await.unwrap_or(false);
                             let _ = reply.send(reachable).await;
                         }
+                        Ok(EngineCommand::GetPeerInfo { address, port, reply }) => {
+                            let eng = engine.lock().await;
+                            let result = eng.get_peer_info(&address, port).await.map_err(|e| e.to_string());
+                            let _ = reply.send(result).await;
+                        }
                         Ok(EngineCommand::GetPendingTransfers { reply }) => {
                             let eng = engine.lock().await;
                             let pending = eng.get_pending_transfers().await;
@@ -185,14 +203,21 @@ impl EngineBridge {
                             let mut eng = engine.lock().await;
                             eng.update_config(config).await;
                         }
-                        Err(_) => break, // Channel closed
+                        Ok(EngineCommand::ChangePort { port, rollback_on_failure }) => {
+                            let mut eng = engine.lock().await;
+                            if rollback_on_failure {
+                                let _ = eng.change_port(port).await;
+                            } else {
+                                let _ = eng.change_port_with_options(port, false).await;
+                            }
+                        }
+                        Err(_) => break,
                     }
                 }
-                // Forward engine events to UI
                 event = engine_events.recv() => {
                     if let Ok(event) = event {
                         if event_tx.send(event).await.is_err() {
-                            break; // Channel closed
+                            break;
                         }
                     }
                 }
@@ -200,182 +225,10 @@ impl EngineBridge {
         }
     }
 
-    /// Start the server
-    pub fn start_server(&self) {
-        let tx = self.command_tx.clone();
-        glib::spawn_future_local(async move {
-            let _ = tx.send(EngineCommand::StartServer).await;
-        });
+    pub fn command_sender(&self) -> Sender<EngineCommand> {
+        self.command_tx.clone()
     }
 
-    /// Stop the server
-    pub fn stop_server(&self) {
-        let tx = self.command_tx.clone();
-        glib::spawn_future_local(async move {
-            let _ = tx.send(EngineCommand::StopServer).await;
-        });
-    }
-
-    /// Resolve hostname - returns result via callback
-    pub fn resolve_address<F>(&self, address: String, callback: F)
-    where
-        F: FnOnce(ResolveResult) + 'static,
-    {
-        let (reply_tx, reply_rx) = async_channel::bounded(1);
-        let tx = self.command_tx.clone();
-
-        glib::spawn_future_local(async move {
-            let _ = tx
-                .send(EngineCommand::ResolveAddress {
-                    address,
-                    reply: reply_tx,
-                })
-                .await;
-
-            if let Ok(result) = reply_rx.recv().await {
-                callback(result);
-            }
-        });
-    }
-
-    /// Send files to peer
-    pub fn send_files(&self, address: String, port: u16, paths: Vec<PathBuf>) {
-        let tx = self.command_tx.clone();
-        glib::spawn_future_local(async move {
-            let _ = tx
-                .send(EngineCommand::SendFiles {
-                    address,
-                    port,
-                    paths,
-                })
-                .await;
-        });
-    }
-
-    /// Accept a pending transfer
-    pub fn accept_transfer(&self, id: String) {
-        let tx = self.command_tx.clone();
-        glib::spawn_future_local(async move {
-            let _ = tx.send(EngineCommand::AcceptTransfer { id }).await;
-        });
-    }
-
-    /// Reject a pending transfer
-    pub fn reject_transfer(&self, id: String) {
-        let tx = self.command_tx.clone();
-        glib::spawn_future_local(async move {
-            let _ = tx.send(EngineCommand::RejectTransfer { id }).await;
-        });
-    }
-
-    /// Send a directory to peer
-    pub fn send_directory(&self, address: String, port: u16, path: PathBuf) {
-        let tx = self.command_tx.clone();
-        glib::spawn_future_local(async move {
-            let _ = tx
-                .send(EngineCommand::SendDirectory {
-                    address,
-                    port,
-                    path,
-                })
-                .await;
-        });
-    }
-
-    /// Accept all pending transfers
-    pub fn accept_all_transfers(&self) {
-        let tx = self.command_tx.clone();
-        glib::spawn_future_local(async move {
-            let _ = tx.send(EngineCommand::AcceptAllTransfers).await;
-        });
-    }
-
-    /// Reject all pending transfers
-    pub fn reject_all_transfers(&self) {
-        let tx = self.command_tx.clone();
-        glib::spawn_future_local(async move {
-            let _ = tx.send(EngineCommand::RejectAllTransfers).await;
-        });
-    }
-
-    /// Cancel an active transfer
-    pub fn cancel_transfer(&self, id: String) {
-        let tx = self.command_tx.clone();
-        glib::spawn_future_local(async move {
-            let _ = tx.send(EngineCommand::CancelTransfer { id }).await;
-        });
-    }
-
-    /// Check if a peer is reachable
-    pub fn check_peer<F>(&self, address: String, port: u16, callback: F)
-    where
-        F: FnOnce(bool) + 'static,
-    {
-        let (reply_tx, reply_rx) = async_channel::bounded(1);
-        let tx = self.command_tx.clone();
-
-        glib::spawn_future_local(async move {
-            let _ = tx
-                .send(EngineCommand::CheckPeer {
-                    address,
-                    port,
-                    reply: reply_tx,
-                })
-                .await;
-
-            if let Ok(reachable) = reply_rx.recv().await {
-                callback(reachable);
-            }
-        });
-    }
-
-    /// Get pending transfers
-    pub fn get_pending_transfers<F>(&self, callback: F)
-    where
-        F: FnOnce(Vec<PendingTransfer>) + 'static,
-    {
-        let (reply_tx, reply_rx) = async_channel::bounded(1);
-        let tx = self.command_tx.clone();
-
-        glib::spawn_future_local(async move {
-            let _ = tx
-                .send(EngineCommand::GetPendingTransfers { reply: reply_tx })
-                .await;
-
-            if let Ok(pending) = reply_rx.recv().await {
-                callback(pending);
-            }
-        });
-    }
-
-    /// Get network interfaces
-    pub fn get_interfaces<F>(&self, callback: F)
-    where
-        F: FnOnce(Vec<NetworkInterface>) + 'static,
-    {
-        let (reply_tx, reply_rx) = async_channel::bounded(1);
-        let tx = self.command_tx.clone();
-
-        glib::spawn_future_local(async move {
-            let _ = tx
-                .send(EngineCommand::GetInterfaces { reply: reply_tx })
-                .await;
-
-            if let Ok(interfaces) = reply_rx.recv().await {
-                callback(interfaces);
-            }
-        });
-    }
-
-    /// Update engine configuration
-    pub fn update_config(&self, config: EngineConfig) {
-        let tx = self.command_tx.clone();
-        glib::spawn_future_local(async move {
-            let _ = tx.send(EngineCommand::UpdateConfig { config }).await;
-        });
-    }
-
-    /// Get event receiver for subscribing to engine events
     pub fn event_receiver(&self) -> Receiver<EngineEvent> {
         self.event_rx.clone()
     }

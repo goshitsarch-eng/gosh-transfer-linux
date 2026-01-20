@@ -2,8 +2,11 @@ name: Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -33,8 +36,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libgtk-4-dev \
-            libadwaita-1-dev \
+            qt6-base-dev \
             libssl-dev \
             pkg-config
 
@@ -45,44 +47,44 @@ jobs:
         uses: swatinem/rust-cache@v2
 
       - name: Build release binary
-        run: cargo build --release -p gosh-transfer-gtk
+        run: cargo build --release -p gosh-transfer-qt
 
       - name: Create tarball
         run: |
           mkdir -p dist
-          cp target/release/gosh-transfer-gtk dist/
-          tar -czvf gosh-transfer-gtk-linux-${{ matrix.arch }}.tar.gz -C dist .
+          cp target/release/gosh-transfer-linux-qt dist/
+          tar -czvf gosh-transfer-linux-qt-${{ matrix.arch }}.tar.gz -C dist .
 
       - name: Install cargo-deb
         run: cargo install cargo-deb
 
       - name: Build deb package
-        run: cargo deb -p gosh-transfer-gtk --no-build
+        run: cargo deb -p gosh-transfer-qt --no-build
 
       - name: Rename deb package
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
-          mv target/debian/*.deb gosh-transfer-gtk_${VERSION}_${{ matrix.deb_arch }}.deb
+          mv target/debian/*.deb gosh-transfer-linux-qt_${VERSION}_${{ matrix.deb_arch }}.deb
 
       - name: Install cargo-generate-rpm
         run: cargo install cargo-generate-rpm
 
       - name: Build rpm package
-        run: cargo generate-rpm -p crates/gosh-transfer-gtk
+        run: cargo generate-rpm -p crates/gosh-transfer-qt
 
       - name: Rename rpm package
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
-          mv target/generate-rpm/*.rpm gosh-transfer-gtk-${VERSION}-1.${{ matrix.rpm_arch }}.rpm
+          mv target/generate-rpm/*.rpm gosh-transfer-linux-qt-${VERSION}-1.${{ matrix.rpm_arch }}.rpm
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: packages-${{ matrix.arch }}
           path: |
-            gosh-transfer-gtk-linux-${{ matrix.arch }}.tar.gz
-            gosh-transfer-gtk_*_${{ matrix.deb_arch }}.deb
-            gosh-transfer-gtk-*.${{ matrix.rpm_arch }}.rpm
+            gosh-transfer-linux-qt-${{ matrix.arch }}.tar.gz
+            gosh-transfer-linux-qt_*_${{ matrix.deb_arch }}.deb
+            gosh-transfer-linux-qt-*.${{ matrix.rpm_arch }}.rpm
 
   build-flatpak:
     runs-on: ubuntu-24.04
@@ -94,8 +96,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libgtk-4-dev \
-            libadwaita-1-dev \
+            qt6-base-dev \
             libssl-dev \
             pkg-config \
             flatpak \
@@ -104,7 +105,7 @@ jobs:
       - name: Setup Flatpak
         run: |
           sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          sudo flatpak install -y flathub org.gnome.Platform//46 org.gnome.Sdk//46
+          sudo flatpak install -y flathub org.kde.Platform//6.7 org.kde.Sdk//6.7
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -113,13 +114,13 @@ jobs:
         uses: swatinem/rust-cache@v2
 
       - name: Build release binary
-        run: cargo build --release -p gosh-transfer-gtk
+        run: cargo build --release -p gosh-transfer-qt
 
       - name: Prepare Flatpak build
         run: |
           mkdir -p flatpak-build
           cp pkg/flatpak/com.gosh.Transfer.yml flatpak-build/
-          cp target/release/gosh-transfer-gtk flatpak-build/
+          cp target/release/gosh-transfer-linux-qt flatpak-build/
           cp data/com.gosh.Transfer.desktop flatpak-build/
           cp data/com.gosh.Transfer.metainfo.xml flatpak-build/
           cp assets/icons/32x32.png flatpak-build/icon-32.png
@@ -130,13 +131,13 @@ jobs:
         run: |
           cd flatpak-build
           flatpak-builder --force-clean --repo=repo build-dir com.gosh.Transfer.yml
-          flatpak build-bundle repo gosh-transfer-gtk-linux-x86_64.flatpak com.gosh.Transfer
+          flatpak build-bundle repo gosh-transfer-linux-qt-x86_64.flatpak com.gosh.Transfer
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: flatpak
-          path: flatpak-build/gosh-transfer-gtk-linux-x86_64.flatpak
+          path: flatpak-build/gosh-transfer-linux-qt-x86_64.flatpak
 
   build-appimage:
     runs-on: ubuntu-24.04
@@ -148,8 +149,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libgtk-4-dev \
-            libadwaita-1-dev \
+            qt6-base-dev \
             libssl-dev \
             pkg-config \
             libfuse2t64 \
@@ -162,13 +162,12 @@ jobs:
         uses: swatinem/rust-cache@v2
 
       - name: Build release binary
-        run: cargo build --release -p gosh-transfer-gtk
+        run: cargo build --release -p gosh-transfer-qt
 
-      - name: Download linuxdeploy
+      - name: Download linuxdeployqt
         run: |
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          wget -q https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh
-          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-gtk.sh
+          wget -q https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-x86_64.AppImage
+          chmod +x linuxdeployqt-x86_64.AppImage
 
       - name: Create AppDir structure
         run: |
@@ -179,7 +178,7 @@ jobs:
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           mkdir -p AppDir/usr/share/metainfo
 
-          cp target/release/gosh-transfer-gtk AppDir/usr/bin/
+          cp target/release/gosh-transfer-linux-qt AppDir/usr/bin/
           cp data/com.gosh.Transfer.desktop AppDir/usr/share/applications/
           cp data/com.gosh.Transfer.metainfo.xml AppDir/usr/share/metainfo/
           cp assets/icons/32x32.png AppDir/usr/share/icons/hicolor/32x32/apps/com.gosh.Transfer.png
@@ -187,23 +186,15 @@ jobs:
           cp assets/icons/128x128@2x.png AppDir/usr/share/icons/hicolor/256x256/apps/com.gosh.Transfer.png
 
       - name: Build AppImage
-        env:
-          DEPLOY_GTK_VERSION: 4
         run: |
-          ./linuxdeploy-x86_64.AppImage \
-            --appdir AppDir \
-            --plugin gtk \
-            --desktop-file data/com.gosh.Transfer.desktop \
-            --icon-file assets/icons/128x128.png \
-            --output appimage
-
-          mv Gosh_Transfer*.AppImage gosh-transfer-gtk-linux-x86_64.AppImage
+          ./linuxdeployqt-x86_64.AppImage AppDir/usr/share/applications/com.gosh.Transfer.desktop -appimage
+          mv Gosh_Transfer*.AppImage gosh-transfer-linux-qt-x86_64.AppImage
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: appimage
-          path: gosh-transfer-gtk-linux-x86_64.AppImage
+          path: gosh-transfer-linux-qt-x86_64.AppImage
 
   create-release:
     needs: [build-packages, build-flatpak, build-appimage]

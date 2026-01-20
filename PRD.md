@@ -4,7 +4,7 @@
 
 **Product Name:** Gosh Transfer Linux
 
-**Description:** A native GTK4/Libadwaita desktop application for explicit peer-to-peer file transfers over local networks, VPNs, and Tailscale.
+**Description:** A native desktop application (Qt6 Widgets frontend) for explicit peer-to-peer file transfers over local networks, VPNs, and Tailscale.
 
 **Core Principle:** No magic, no cloud, no auto-discovery. Users specify exactly where files go using IP addresses or hostnames.
 
@@ -136,7 +136,7 @@
 
 ## Constraints
 
-1. **Linux-only**: GTK4/Libadwaita requires Linux (or compatible)
+1. **Linux-only**: The current distribution target is Linux
 2. **Trusted networks**: No built-in encryption; relies on network security
 3. **IPv4 focus**: Primary support for IPv4 addresses
 4. **Single instance**: One server per machine on port 53317
@@ -154,7 +154,7 @@
 
 Features supported by the engine but not yet exposed in the UI:
 
-1. **Runtime port change**: The engine supports dynamic port changes, but the GTK frontend recommends an app restart after port changes
+1. **Runtime port change**: The engine supports dynamic port changes, and the Qt frontend exposes this
 
 Previously planned features now implemented:
 - Directory sending (v2.0.3+)
@@ -175,5 +175,5 @@ This document describes requirements for version 2.x. Specific release dates are
 | Auto-discovery | No | Yes | Yes |
 | Cloud dependency | No | No | No |
 | Explicit addressing | Yes | No | No |
-| GTK4 native | Yes | No | Yes |
+| Qt6 native | Yes | No | Yes |
 | Cross-platform | Linux only | Yes | Linux only |

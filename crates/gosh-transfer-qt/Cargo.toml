@@ -1,46 +1,53 @@
 [package]
-name = "gosh-transfer-gtk"
+name = "gosh-transfer-qt"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "GTK4/Libadwaita frontend for Gosh Transfer"
+description = "Qt6 Widgets frontend for Gosh Transfer"
+repository.workspace = true
 
 [[bin]]
-name = "gosh-transfer-gtk"
+name = "gosh-transfer-linux-qt"
 path = "src/main.rs"
 
 [dependencies]
-# Core shared logic
+# Workspace core
+
 gosh-transfer-core.workspace = true
 gosh-lan-transfer.workspace = true
 
-# GTK4 and Libadwaita
-gtk4.workspace = true
-libadwaita.workspace = true
-glib.workspace = true
-gio.workspace = true
-gdk-pixbuf.workspace = true
+# Async + channels
 
-# Async runtime and GTK bridge
 tokio.workspace = true
 async-channel.workspace = true
 
-# Serialization
+# Utilities
+
 serde.workspace = true
 serde_json.workspace = true
-
-# Utilities
+uuid.workspace = true
 chrono.workspace = true
+thiserror.workspace = true
+hostname.workspace = true
+directories.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+once_cell = "1"
+
+# Qt (cxx-qt)
+
+cxx = "1"
+cxx-qt = "0.7.3"
+cxx-qt-lib = { version = "0.7.3" }
 
 [build-dependencies]
-glib-build-tools = "0.20"
+
+cxx-qt-build = "0.7.3"
 
 [package.metadata.deb]
 maintainer = "Goshitsarch <noreply@gosh.sh>"
-copyright = "2025, Goshitsarch"
+copyright = "2026, Goshitsarch"
 license-file = ["../../LICENSE", "0"]
 extended-description = """\
 Gosh Transfer is a clean, explicit file transfer application for sending \
@@ -52,7 +59,7 @@ section = "net"
 priority = "optional"
 depends = "$auto"
 assets = [
-    ["target/release/gosh-transfer-gtk", "usr/bin/", "755"],
+    ["target/release/gosh-transfer-linux-qt", "usr/bin/", "755"],
     ["../../data/com.gosh.Transfer.desktop", "usr/share/applications/", "644"],
     ["../../data/com.gosh.Transfer.metainfo.xml", "usr/share/metainfo/", "644"],
     ["../../assets/icons/32x32.png", "usr/share/icons/hicolor/32x32/apps/com.gosh.Transfer.png", "644"],
@@ -62,7 +69,7 @@ assets = [
 
 [package.metadata.generate-rpm]
 assets = [
-    { source = "target/release/gosh-transfer-gtk", dest = "/usr/bin/gosh-transfer-gtk", mode = "755" },
+    { source = "target/release/gosh-transfer-linux-qt", dest = "/usr/bin/gosh-transfer-linux-qt", mode = "755" },
     { source = "data/com.gosh.Transfer.desktop", dest = "/usr/share/applications/com.gosh.Transfer.desktop", mode = "644" },
     { source = "data/com.gosh.Transfer.metainfo.xml", dest = "/usr/share/metainfo/com.gosh.Transfer.metainfo.xml", mode = "644" },
     { source = "assets/icons/32x32.png", dest = "/usr/share/icons/hicolor/32x32/apps/com.gosh.Transfer.png", mode = "644" },
@@ -71,5 +78,4 @@ assets = [
 ]
 
 [package.metadata.generate-rpm.requires]
-gtk4 = "*"
-libadwaita = "*"
+qt6-qtbase = "*"
