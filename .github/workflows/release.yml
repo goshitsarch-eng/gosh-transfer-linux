@@ -60,13 +60,7 @@ jobs:
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             VERSION="${GITHUB_REF#refs/tags/v}"
           else
-            VERSION=$(python - <<'PY'
-              import tomllib
-              with open("Cargo.toml", "rb") as f:
-                  data = tomllib.load(f)
-              print(data["workspace"]["package"]["version"])
-              PY
-            )
+            VERSION=$(python -c 'import tomllib; data = tomllib.load(open("Cargo.toml", "rb")); print(data["workspace"]["package"]["version"])')
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
