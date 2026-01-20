@@ -166,8 +166,8 @@ jobs:
 
       - name: Download linuxdeployqt
         run: |
-          wget -q https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-x86_64.AppImage
-          chmod +x linuxdeployqt-x86_64.AppImage
+          curl -L -o linuxdeployqt.AppImage https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
+          chmod +x linuxdeployqt.AppImage
 
       - name: Create AppDir structure
         run: |
@@ -187,7 +187,7 @@ jobs:
 
       - name: Build AppImage
         run: |
-          ./linuxdeployqt-x86_64.AppImage AppDir/usr/share/applications/com.gosh.Transfer.desktop -appimage
+          ./linuxdeployqt.AppImage AppDir/usr/share/applications/com.gosh.Transfer.desktop -appimage
           mv Gosh_Transfer*.AppImage gosh-transfer-linux-qt-x86_64.AppImage
 
       - name: Upload artifact
