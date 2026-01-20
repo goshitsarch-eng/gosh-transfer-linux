@@ -139,65 +139,8 @@ jobs:
           name: flatpak
           path: flatpak-build/gosh-transfer-linux-qt-x86_64.flatpak
 
-  build-appimage:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            qt6-base-dev \
-            libssl-dev \
-            pkg-config \
-            libfuse2t64 \
-            file
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-
-      - name: Build release binary
-        run: cargo build --release -p gosh-transfer-qt
-
-      - name: Download linuxdeployqt
-        run: |
-          curl -L -o linuxdeployqt.AppImage https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
-          chmod +x linuxdeployqt.AppImage
-
-      - name: Create AppDir structure
-        run: |
-          mkdir -p AppDir/usr/bin
-          mkdir -p AppDir/usr/share/applications
-          mkdir -p AppDir/usr/share/icons/hicolor/32x32/apps
-          mkdir -p AppDir/usr/share/icons/hicolor/128x128/apps
-          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-          mkdir -p AppDir/usr/share/metainfo
-
-          cp target/release/gosh-transfer-linux-qt AppDir/usr/bin/
-          cp data/com.gosh.Transfer.desktop AppDir/usr/share/applications/
-          cp data/com.gosh.Transfer.metainfo.xml AppDir/usr/share/metainfo/
-          cp assets/icons/32x32.png AppDir/usr/share/icons/hicolor/32x32/apps/com.gosh.Transfer.png
-          cp assets/icons/128x128.png AppDir/usr/share/icons/hicolor/128x128/apps/com.gosh.Transfer.png
-          cp assets/icons/128x128@2x.png AppDir/usr/share/icons/hicolor/256x256/apps/com.gosh.Transfer.png
-
-      - name: Build AppImage
-        run: |
-          ./linuxdeployqt.AppImage AppDir/usr/share/applications/com.gosh.Transfer.desktop -appimage
-          mv Gosh_Transfer*.AppImage gosh-transfer-linux-qt-x86_64.AppImage
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: appimage
-          path: gosh-transfer-linux-qt-x86_64.AppImage
-
   create-release:
-    needs: [build-packages, build-flatpak, build-appimage]
+    needs: [build-packages, build-flatpak]
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
@@ -208,7 +151,7 @@ jobs:
       - name: Collect release files
         run: |
           mkdir -p release
-          find artifacts -type f \( -name "*.tar.gz" -o -name "*.deb" -o -name "*.rpm" -o -name "*.flatpak" -o -name "*.AppImage" \) -exec cp {} release/ \;
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.deb" -o -name "*.rpm" -o -name "*.flatpak" \) -exec cp {} release/ \;
           ls -la release/
 
       - name: Upload to GitHub Release
