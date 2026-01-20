@@ -55,6 +55,21 @@ jobs:
           cp target/release/gosh-transfer-linux-qt dist/
           tar -czvf gosh-transfer-linux-qt-${{ matrix.arch }}.tar.gz -C dist .
 
+      - name: Set version
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION=$(python - <<'PY'
+import tomllib
+with open("Cargo.toml", "rb") as f:
+    data = tomllib.load(f)
+print(data["workspace"]["package"]["version"])
+PY
+)
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
       - name: Install cargo-deb
         run: cargo install cargo-deb
 
@@ -63,7 +78,6 @@ jobs:
 
       - name: Rename deb package
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
           mv target/debian/*.deb gosh-transfer-linux-qt_${VERSION}_${{ matrix.deb_arch }}.deb
 
       - name: Install cargo-generate-rpm
@@ -74,7 +88,6 @@ jobs:
 
       - name: Rename rpm package
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
           mv target/generate-rpm/*.rpm gosh-transfer-linux-qt-${VERSION}-1.${{ matrix.rpm_arch }}.rpm
 
       - name: Upload artifacts
@@ -140,6 +153,7 @@ jobs:
           path: flatpak-build/gosh-transfer-linux-qt-x86_64.flatpak
 
   create-release:
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: [build-packages, build-flatpak]
     runs-on: ubuntu-latest
     steps:
