@@ -1,65 +1,53 @@
 [package]
-name = "gosh-transfer-qt"
+name = "gosh-transfer-tauri"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "Qt6 Widgets frontend for Gosh Transfer"
-repository.workspace = true
+description = "Tauri desktop frontend for Gosh Transfer"
 
 [[bin]]
-name = "gosh-transfer-linux-qt"
+name = "gosh-transfer-linux"
 path = "src/main.rs"
 
-[dependencies]
-# Workspace core
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
 
+[dependencies]
+# Tauri
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
+
+# Core transfer engine and logic
 gosh-transfer-core.workspace = true
 gosh-lan-transfer.workspace = true
 
-# Async + channels
-
+# Async runtime
 tokio.workspace = true
 async-channel.workspace = true
 
-# Utilities
-
+# Serialization
 serde.workspace = true
 serde_json.workspace = true
-uuid.workspace = true
-chrono.workspace = true
-thiserror.workspace = true
-hostname.workspace = true
-directories.workspace = true
+
+# Utilities
 tracing.workspace = true
 tracing-subscriber.workspace = true
-once_cell = "1"
 
-# Qt (cxx-qt)
-
-cxx = "1"
-cxx-qt = "0.7.3"
-cxx-qt-lib = { version = "0.7.3" }
-
-[build-dependencies]
-
-cxx-qt-build = "0.7.3"
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
 
 [package.metadata.deb]
 maintainer = "Goshitsarch <noreply@gosh.sh>"
-copyright = "2026, Goshitsarch"
 license-file = ["../../LICENSE", "0"]
-extended-description = """\
-Gosh Transfer is a clean, explicit file transfer application for sending \
-and receiving files over local networks, Tailscale, and VPNs. Unlike \
-automatic discovery tools, Gosh Transfer requires you to explicitly \
-specify the recipient's IP address, giving you full control over your \
-file transfers."""
 section = "net"
 priority = "optional"
-depends = "$auto"
+depends = "$auto, libwebkit2gtk-4.1-0"
 assets = [
-    ["target/release/gosh-transfer-linux-qt", "usr/bin/", "755"],
+    ["target/release/gosh-transfer-linux", "usr/bin/", "755"],
     ["../../data/com.gosh.Transfer.desktop", "usr/share/applications/", "644"],
     ["../../data/com.gosh.Transfer.metainfo.xml", "usr/share/metainfo/", "644"],
     ["../../assets/icons/32x32.png", "usr/share/icons/hicolor/32x32/apps/com.gosh.Transfer.png", "644"],
@@ -69,7 +57,7 @@ assets = [
 
 [package.metadata.generate-rpm]
 assets = [
-    { source = "target/release/gosh-transfer-linux-qt", dest = "/usr/bin/gosh-transfer-linux-qt", mode = "755" },
+    { source = "target/release/gosh-transfer-linux", dest = "/usr/bin/gosh-transfer-linux", mode = "755" },
     { source = "data/com.gosh.Transfer.desktop", dest = "/usr/share/applications/com.gosh.Transfer.desktop", mode = "644" },
     { source = "data/com.gosh.Transfer.metainfo.xml", dest = "/usr/share/metainfo/com.gosh.Transfer.metainfo.xml", mode = "644" },
     { source = "assets/icons/32x32.png", dest = "/usr/share/icons/hicolor/32x32/apps/com.gosh.Transfer.png", mode = "644" },
@@ -78,4 +66,4 @@ assets = [
 ]
 
 [package.metadata.generate-rpm.requires]
-qt6-qtbase = "*"
+webkit2gtk4.1 = "*"

@@ -32,12 +32,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            qt6-base-dev \
             libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            librsvg2-dev \
             pkg-config
 
       - name: Install Rust
@@ -46,14 +48,33 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
 
-      - name: Build release binary
-        run: cargo build --release -p gosh-transfer-qt
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        run: |
+          cd src-ui
+          npm install
+
+      - name: Build frontend
+        run: |
+          cd src-ui
+          npm run build
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli
+
+      - name: Build Tauri app
+        run: cargo tauri build -b none
+        working-directory: crates/gosh-transfer-tauri
 
       - name: Create tarball
         run: |
           mkdir -p dist
-          cp target/release/gosh-transfer-linux-qt dist/
-          tar -czvf gosh-transfer-linux-qt-${{ matrix.arch }}.tar.gz -C dist .
+          cp target/release/gosh-transfer-linux dist/
+          tar -czvf gosh-transfer-linux-${{ matrix.arch }}.tar.gz -C dist .
 
       - name: Set version
         run: |
@@ -68,30 +89,30 @@ jobs:
         run: cargo install cargo-deb
 
       - name: Build deb package
-        run: cargo deb -p gosh-transfer-qt --no-build
+        run: cargo deb -p gosh-transfer-tauri --no-build
 
       - name: Rename deb package
         run: |
-          mv target/debian/*.deb gosh-transfer-linux-qt_${VERSION}_${{ matrix.deb_arch }}.deb
+          mv target/debian/*.deb gosh-transfer-linux_${VERSION}_${{ matrix.deb_arch }}.deb
 
       - name: Install cargo-generate-rpm
         run: cargo install cargo-generate-rpm
 
       - name: Build rpm package
-        run: cargo generate-rpm -p crates/gosh-transfer-qt
+        run: cargo generate-rpm -p crates/gosh-transfer-tauri
 
       - name: Rename rpm package
         run: |
-          mv target/generate-rpm/*.rpm gosh-transfer-linux-qt-${VERSION}-1.${{ matrix.rpm_arch }}.rpm
+          mv target/generate-rpm/*.rpm gosh-transfer-linux-${VERSION}-1.${{ matrix.rpm_arch }}.rpm
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: packages-${{ matrix.arch }}
           path: |
-            gosh-transfer-linux-qt-${{ matrix.arch }}.tar.gz
-            gosh-transfer-linux-qt_*_${{ matrix.deb_arch }}.deb
-            gosh-transfer-linux-qt-*.${{ matrix.rpm_arch }}.rpm
+            gosh-transfer-linux-${{ matrix.arch }}.tar.gz
+            gosh-transfer-linux_*_${{ matrix.deb_arch }}.deb
+            gosh-transfer-linux-*.${{ matrix.rpm_arch }}.rpm
 
   build-flatpak:
     runs-on: ubuntu-24.04
@@ -99,12 +120,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            qt6-base-dev \
             libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            librsvg2-dev \
             pkg-config \
             flatpak \
             flatpak-builder
@@ -112,7 +135,7 @@ jobs:
       - name: Setup Flatpak
         run: |
           sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          sudo flatpak install -y flathub org.kde.Platform//6.7 org.kde.Sdk//6.7
+          sudo flatpak install -y flathub org.gnome.Platform//46 org.gnome.Sdk//46
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -120,14 +143,33 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
 
-      - name: Build release binary
-        run: cargo build --release -p gosh-transfer-qt
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        run: |
+          cd src-ui
+          npm install
+
+      - name: Build frontend
+        run: |
+          cd src-ui
+          npm run build
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli
+
+      - name: Build Tauri app
+        run: cargo tauri build -b none
+        working-directory: crates/gosh-transfer-tauri
 
       - name: Prepare Flatpak build
         run: |
           mkdir -p flatpak-build
           cp pkg/flatpak/com.gosh.Transfer.yml flatpak-build/
-          cp target/release/gosh-transfer-linux-qt flatpak-build/
+          cp target/release/gosh-transfer-linux flatpak-build/
           cp data/com.gosh.Transfer.desktop flatpak-build/
           cp data/com.gosh.Transfer.metainfo.xml flatpak-build/
           cp assets/icons/32x32.png flatpak-build/icon-32.png
@@ -138,13 +180,13 @@ jobs:
         run: |
           cd flatpak-build
           flatpak-builder --force-clean --repo=repo build-dir com.gosh.Transfer.yml
-          flatpak build-bundle repo gosh-transfer-linux-qt-x86_64.flatpak com.gosh.Transfer
+          flatpak build-bundle repo gosh-transfer-linux-x86_64.flatpak com.gosh.Transfer
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: flatpak
-          path: flatpak-build/gosh-transfer-linux-qt-x86_64.flatpak
+          path: flatpak-build/gosh-transfer-linux-x86_64.flatpak
 
   create-release:
     if: startsWith(github.ref, 'refs/tags/v')

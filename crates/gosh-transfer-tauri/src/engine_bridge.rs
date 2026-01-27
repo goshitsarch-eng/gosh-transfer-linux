@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
-// Gosh Transfer Qt - Engine Bridge
+// Gosh Transfer Tauri - Engine Bridge
 //
-// Bridges the async GoshTransferEngine with the Qt main thread.
+// Bridges the async GoshTransferEngine with the Tauri frontend.
 
 use async_channel::{Receiver, Sender};
 use gosh_lan_transfer::{
@@ -69,7 +69,7 @@ pub enum EngineCommand {
     },
 }
 
-/// Bridge between Qt UI and async engine
+/// Bridge between Tauri frontend and async engine
 pub struct EngineBridge {
     command_tx: Sender<EngineCommand>,
     event_rx: Receiver<EngineEvent>,

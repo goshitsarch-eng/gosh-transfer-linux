@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
     "crates/gosh-transfer-core",
-    "crates/gosh-transfer-qt",
+    "crates/gosh-transfer-tauri",
 ]
 
 [workspace.package]

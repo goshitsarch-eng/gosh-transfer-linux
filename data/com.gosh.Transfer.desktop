@@ -2,7 +2,7 @@
 Name=Gosh Transfer
 GenericName=File Transfer
 Comment=Simple, explicit file transfers over LAN, Tailscale, and VPNs
-Exec=gosh-transfer-linux-qt
+Exec=gosh-transfer-linux
 Icon=com.gosh.Transfer
 Terminal=false
 Type=Application
