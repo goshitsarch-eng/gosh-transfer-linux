@@ -1,7 +1,7 @@
 {
   "name": "gosh-transfer-ui",
   "private": true,
-  "version": "2.20.0",
+  "version": "2.30.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
